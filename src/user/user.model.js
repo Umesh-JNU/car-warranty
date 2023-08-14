@@ -14,14 +14,6 @@ const validatePassword = (password) => {
 };
 
 const userSchema = new mongoose.Schema({
-	firstname: {
-		type: String,
-		required: [true, "Firstname is required."],
-	},
-	lastname: {
-		type: String,
-		required: [true, "Lastname is required."],
-	},
 	email: {
 		type: String,
 		required: [true, "Email is required."],
@@ -34,10 +26,10 @@ const userSchema = new mongoose.Schema({
 		minLength: [8, "Password must have at least 8 characters."],
 		select: false,
 	},
-	mobile_no: {
-		type: String,
-		required: [true, "Phone number is required."],
-	},
+	firstname: { type: String },
+	lastname: { type: String },
+	mobile_no: { type: String },
+	profile_img: { type: String },
 	role: {
 		type: String,
 		default: "user",

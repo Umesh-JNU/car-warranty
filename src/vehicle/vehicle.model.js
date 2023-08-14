@@ -18,9 +18,9 @@ const vehicleSchema = new mongoose.Schema({
 		type: String,
 		required: [true, "Please specify the size of engine."],
 	},
-	milege: {
+	mileage: {
 		type: String,
-		required: [true, "Milege is required."],
+		required: [true, "mileage is required."],
 	},
 	retail_val: {
 		type: String,

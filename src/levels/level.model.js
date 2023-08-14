@@ -10,9 +10,9 @@ const levelSchema = new mongoose.Schema({
     type: Number,
     required: [true, "Please specify the max age limit for the vehicle."]
   },
-  max_milege: {
+  max_mileage: {
     type: Number,
-    required: [true, "Please specify the max milege limit for the vehicle."]
+    required: [true, "Please specify the max mileage limit for the vehicle."]
   },
 }, { timestamps: true });
 

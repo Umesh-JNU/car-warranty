@@ -7,15 +7,23 @@ const sendEmail = require("../../utils/sendEmail");
 const userModel = require("./user.model");
 const path = require('path');
 
+const userUpdate = async (id, info, res, next) => {
+  console.log({ id, info });
+  const user = await userModel.findByIdAndUpdate(id, info, {
+    new: true,
+    runValidators: true
+  });
+
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  res.status(200).json({ user });
+}
 // Create a new document
 exports.createUser = catchAsyncError(async (req, res, next) => {
-  const { userInfo } = req.body;
-  if (!userInfo) {
-    return next(new ErrorHandler("Please enter your details.", 400));
-  }
-
+  const { email } = req.body;
   const password = passwordGenerator();
-  const userDetails = { ...userInfo, password };
+
+  const userDetails = { email, password };
   const user = await userModel.create(userDetails);
   if (!user) {
     return next(new ErrorHandler("Something Went Wrong. Please try again.", 500));
@@ -36,8 +44,10 @@ exports.createUser = catchAsyncError(async (req, res, next) => {
       message: renderedTemplate
     });
 
+    const token = await user.getJWTToken();
     res.status(200).json({
       user,
+      token,
       message: `Email sent to ${user.email} successfully.`,
     });
   } catch (error) {
@@ -62,20 +72,15 @@ exports.login = catchAsyncError(async (req, res, next) => {
   if (!isPasswordMatched)
     return next(new ErrorHandler("Invalid password!", 401));
 
-  sendData(user, 200, res);
-});
-
-// Get all documents
-exports.getAllUser = catchAsyncError(async (req, res, next) => {
-  const users = await userModel.find();
-  res.status(200).json({ users });
+  const token = await user.getJWTToken();
+  res.status(200).json({ user, token });
 });
 
 // Get a single document by ID
 exports.getUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-
-  const user = await userModel.findById(id);
+  const userId = req.userId;
+  const user = await userModel.findById(id ? id : userId);
   if (!user) {
     return next(new ErrorHandler("User not found.", 404));
   }
@@ -84,18 +89,56 @@ exports.getUser = catchAsyncError(async (req, res, next) => {
 });
 
 // Update a document by ID
+exports.updateProfile = catchAsyncError(async (req, res, next) => {
+  const userId = req.userId;
+  delete req.body.password;
+
+  console.log(req.body)
+  await userUpdate(userId, req.body, res, next);
+});
+
+exports.updatePassword = catchAsyncError(async (req, res, next) => {
+  const userId = req.userId;
+  const { curPassword, newPassword, confirmPassword } = req.body;
+  if (!curPassword)
+    return next(new ErrorHandler("Current Password is required.", 400));
+
+  if (!newPassword || !confirmPassword)
+    return next(new ErrorHandler("Password or Confirm Password is required.", 400));
+
+  if (newPassword !== confirmPassword)
+    return next(new ErrorHandler("Please confirm your password,", 400));
+
+  const user = await userModel.findOne({ _id: userId }).select("+password");
+  if (!user) return new ErrorHandler("User Not Found.", 404);
+
+  const isPasswordMatched = await user.comparePassword(curPassword);
+  if (!isPasswordMatched)
+    return next(new ErrorHandler("Current Password is invalid.", 400));
+
+  user.password = newPassword;
+  await user.save();
+  res.status(200).json({ message: "Password Updated Successfully." });
+});
+
+
 exports.updateUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const user = await userModel.findByIdAndUpdate(id, req.body, {
-    new: true,
-    runValidators: true,
-    useFindAndModify: false,
-  });
+  const userId = req.userId;
 
-  if (!user) return next(new ErrorHandler('User not found', 404));
-
-  res.status(200).json({ user });
+  await userUpdate(id ? id : userId, next)
 });
+
+
+// Get all documents
+exports.getAllUser = catchAsyncError(async (req, res, next) => {
+  const users = await userModel.find();
+  res.status(200).json({ users });
+});
+
+
+
+
 
 // Delete a document by ID
 exports.deleteUser = catchAsyncError(async (req, res, next) => {

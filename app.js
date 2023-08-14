@@ -20,10 +20,12 @@ app.use(
 
 app.get("/", (req, res, next) => res.json({ message: "Server is running" }));
 
-const { userRoute, levelRoute } = require("./src");
+const { userRoute, levelRoute, warrantyRoute, transactionRoute } = require("./src");
 
 app.use("/api/user", userRoute);
 app.use("/api/level", levelRoute);
+app.use("/api/warranty", warrantyRoute);
+app.use("/api/transaction", transactionRoute);
 
 app.all("*", async (req, res) => {
   res
@@ -38,3 +40,4 @@ app.all("*", async (req, res) => {
 app.use(errorMiddleware);
 
 module.exports = app;
+

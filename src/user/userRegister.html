@@ -8,21 +8,17 @@
 </head>
 
 <body>
-  <p>Hello {{firstname}} {{lastname}},</p>
+  <p>Dear User,</p>
 
-  </p>Thank you for registering with us! Your account has been successfully created.</p>
+  <p>Congratulations on successfully registering with [Your Platform Name]! We're excited to have you on board.</p>
+  
+  <p>Your email is now registered with us. To fully access your account and enjoy all the features of our platform, we kindly ask you to complete your profile.</p>
 
-  <u>
-    <p>Here are your registration details:</p>
-  </u>
+  <p>You can update your profile by clicking the below link using the given password.<br/>{{profileURL}}</p>
 
-  <ul style="list-style: none; font-weight: bold;">
-    <li>First Name: {{firstname}}</li>
-    <li>Last Name: {{lastname}}</li>
-    <li>Email: {{email}}</li>
-    <li>Mobile No.: {{mobile_no}}</li>
-    <li>Password: {{password}}</li>
-  </ul>
+  <p style="border: 1px solid #d3d3d3; border-radius: 10px; padding: 1rem; font-size: 1.5rem; width: max-content">
+    <strong>Password: {{password}}</strong>
+  </p>
 
   <p>Please keep your password secure and do not share it with anyone.</p>
 

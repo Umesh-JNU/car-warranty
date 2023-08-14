@@ -2,12 +2,21 @@ const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const APIFeatures = require("../../utils/apiFeatures");
 const warrantyModel = require("./warranty.model");
+const { isValidObjectId } = require("mongoose");
 
 
 // Create a new document
 exports.createWarranty = catchAsyncError(async (req, res, next) => {
-  const warranty = await warrantyModel.create(req.body);
+  console.log("warranty create", req.body);
+  const warranty = await warrantyModel.create({ ...req.body, user: req.userId });
   res.status(201).json({ warranty });
+});
+
+// user's all warranties
+exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
+  const userId = req.userId;
+  const warranties = await warrantyModel.find({ user: userId }).select("-user");
+  res.status(200).json({ warranties });
 });
 
 // Get all documents
@@ -19,8 +28,12 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
 // Get a single document by ID
 exports.getWarranty = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
+  if (!req.user) {
+    var warranty = await warrantyModel.findOne({ _id: id, user: req.userId }).select("-user");
+  } else {
+    var warranty = await warrantyModel.findById(id);
+  }
 
-  const warranty = await warrantyModel.findById(id);
   if (!warranty) {
     return next(new ErrorHandler("Warranty not found.", 404));
   }

@@ -84,33 +84,34 @@ const evalLoad = (s, b, type) => {
   return base_laod;
 }
 
-const getAge = (mfd) => {
-  const manufacturedDate = new Date(mfd);
+const getAge = (dateFirstReg) => {
+  const manufacturedDate = new Date(dateFirstReg);
   const currentDate = new Date();
   return (currentDate - manufacturedDate) / (1000 * 60 * 60 * 24 * 365.25);
 };
 
 exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
   console.log("Get all level suggestion", req.query);
-  const { engineSize, bhp, milege, driveType, mfd } = req.query;
+  const { engineSize, bhp, mileage, driveType, dateFirstReg } = req.query;
 
-  if (!engineSize || !bhp || !milege || !driveType || !mfd) {
+  console.log({ engineSize, bhp, mileage, driveType, dateFirstReg })
+  if (!engineSize || !bhp || !mileage || !driveType || !dateFirstReg) {
     return next(new ErrorHandler("Bad Request", 400));
   }
 
   const e = parseInt(engineSize);
   const b = parseInt(bhp);
-  const a = getAge(mfd);
-  const m = parseInt(milege);
+  const a = getAge(dateFirstReg);
+  const m = parseInt(mileage);
 
   const load_per = evalLoad(e, b, driveType);
-  console.log({ e, b, m, load_per });
+  console.log({ a, e, b, m, load_per });
 
   const levelsAndPlans = await levelModel.aggregate([
     {
       $match: {
         max_age: { $gte: a },
-        max_milege: { $gte: m }
+        // max_mileage: { $$gte: m }
       }
     },
     {
@@ -160,7 +161,7 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
           _id: "$_id",
           level: "$level",
           max_age: "$max_age",
-          max_milege: "$max_milege",
+          max_mileage: "$max_mileage",
           createdAt: "$createdAt",
           updatedAt: "$updatedAt",
           __v: "$__v",
@@ -187,7 +188,7 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
     //                 "_id": "64d4cbe0571819d2fbdcfc50",
     //                 "level": "safe",
     //                 "max_age": 100,
-    //                 "max_milege": 1000000000000,
+    //                 "max_mileage": 1000000000000,
     //                 "createdAt": "2023-08-10T11:37:04.572Z",
     //                 "updatedAt": "2023-08-10T11:37:04.572Z",
     //                 "__v": 0,
@@ -200,7 +201,7 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
     //                 "_id": "64d4cc12571819d2fbdcfc52",
     //                 "level": "secure",
     //                 "max_age": 15,
-    //                 "max_milege": 100000,
+    //                 "max_mileage": 100000,
     //                 "createdAt": "2023-08-10T11:37:54.133Z",
     //                 "updatedAt": "2023-08-10T11:37:54.133Z",
     //                 "__v": 0,
@@ -213,7 +214,7 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
     //                 "_id": "64d4cc12571819d2fbdcfc52",
     //                 "level": "secure",
     //                 "max_age": 15,
-    //                 "max_milege": 100000,
+    //                 "max_mileage": 100000,
     //                 "createdAt": "2023-08-10T11:37:54.133Z",
     //                 "updatedAt": "2023-08-10T11:37:54.133Z",
     //                 "__v": 0,
@@ -226,7 +227,7 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
     //                 "_id": "64d4cbe0571819d2fbdcfc50",
     //                 "level": "safe",
     //                 "max_age": 100,
-    //                 "max_milege": 1000000000000,
+    //                 "max_mileage": 1000000000000,
     //                 "createdAt": "2023-08-10T11:37:04.572Z",
     //                 "updatedAt": "2023-08-10T11:37:04.572Z",
     //                 "__v": 0,
@@ -242,12 +243,15 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
         _id: "$_id._id",
         level: { $first: "$_id.level" },
         max_age: { $first: "$_id.max_age" },
-        max_milege: { $first: "$_id.max_milege" },
+        max_mileage: { $first: "$_id.max_mileage" },
         createdAt: { $first: "$_id.createdAt" },
         updatedAt: { $first: "$_id.updatedAt" },
         __v: { $first: "$_id.__v" },
         plansByClaim: { $push: { claim: "$_id.claim", plans: "$plans" } },
       }
+    },
+    {
+      $sort: {plansByClaim: 1}
     }
   ]);
 
