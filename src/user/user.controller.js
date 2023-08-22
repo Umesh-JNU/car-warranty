@@ -121,22 +121,45 @@ exports.updatePassword = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ message: "Password Updated Successfully." });
 });
 
-
+// update new document
 exports.updateUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  const userId = req.userId;
-
-  await userUpdate(id ? id : userId, next)
+  await userUpdate(id, req.body, res, next)
 });
 
 
 // Get all documents
 exports.getAllUser = catchAsyncError(async (req, res, next) => {
-  const users = await userModel.find();
-  res.status(200).json({ users });
+  console.log("get all users", req.query);
+  let role = {};
+  if (req.query.role) {
+    role = { role: req.query.role };
+  }
+  
+  const apiFeature = new APIFeatures(
+    userModel.find(role).sort({ createdAt: -1 }),
+    req.query
+  ).search("firstname");
+
+  let users = await apiFeature.query;
+  console.log("users", users);
+  let filteredUserCount = users.length;
+  if (req.query.resultPerPage && req.query.currentPage) {
+    apiFeature.pagination();
+
+    console.log("filteredUserCount", filteredUserCount);
+    users = await apiFeature.query.clone();
+  }
+  console.log("users", users);
+  res.status(200).json({ users, filteredUserCount });
 });
 
-
+// create sale person
+exports.createSalePerson = catchAsyncError(async (req, res, next) => {
+  console.log("create sale person", req.body);
+  const salePerson = await userModel.create({ role: "sale-person", ...req.body });
+  res.status(200).json({ salePerson });
+})
 
 
 

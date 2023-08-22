@@ -27,12 +27,12 @@ const planSchema = new mongoose.Schema({
   },
   month: {
     type: Number,
-    required: [true, "Please specify the plan tenure"]
+    required: [true, "Please specify the plan tenure."]
   },
   level: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Level",
-    required: [true, "Please specify the warranty level"]
+    required: [true, "Please specify the warranty level."]
   }
 }, { timestamps: true });
 

@@ -1,7 +1,6 @@
 const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const mongoose = require("mongoose");
-const vehicleModel = require("../vehicle/vehicle.model");
 const warrantyModel = require("../warranty/warranty.model");
 
 exports.createPayment = catchAsyncError(async (req, res, next) => {
@@ -28,7 +27,7 @@ exports.createPayment = catchAsyncError(async (req, res, next) => {
   try {
     const vehicle = await vehicleModel.create([{ vehicleDetails }], { session });
     const warranty = await warrantyModel.create([{ userDetails, start_date, vehicle: vehicleDetails }], { session });
-    
+
     // Commit the transaction if all creations were successful
     await session.commitTransaction();
     session.endSession();
@@ -43,4 +42,10 @@ exports.createPayment = catchAsyncError(async (req, res, next) => {
     console.error('Error creating instances:', error.message);
     res.status(500).send('Error creating instances.');
   }
+});
+
+exports.updateAfterPayment = catchAsyncError(async (req, res, next) => {
+
+  console.log(req.body);
+  res.status(200).json({message: "Acknowledged."});
 });

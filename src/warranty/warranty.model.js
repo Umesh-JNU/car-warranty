@@ -12,7 +12,7 @@ const vehicleDetailSchema = new mongoose.Schema({
 	},
 	fuel_type: {
 		type: String,
-		enum: ['Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid'],
+		// enum: ['Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid'],
 		required: [true, "Fuel Type is required."],
 	},
 	model: {
@@ -25,15 +25,15 @@ const vehicleDetailSchema = new mongoose.Schema({
 	},
 	size: {
 		type: Number,
-		required: [true, "Engine Size is required,"],
+		required: [true, "Engine Size is required."],
 	},
 	mileage: {
 		type: Number,
-		required: [true, "mileage is required."],
+		required: [true, "Mileage is required."],
 	},
 	drive_type: {
 		type: String,
-		enum: ['4x4', '4x2'],
+		// enum: ['4x4', '4x2'],
 		required: [true, "Drive Type is required."],
 	},
 	bhp: {
@@ -88,7 +88,7 @@ const addressSchema = new mongoose.Schema({
 const vehicleInfoSchema = new mongoose.Schema({
 	purchase_date: {
 		type: Date,
-		required: [true, "Vehicle's is required."]
+		required: [true, "Vehicle's purchase date is required."]
 	},
 	mot_due_date: {
 		type: Date,
@@ -128,12 +128,7 @@ const warrantySchema = new mongoose.Schema({
 	user: {
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "User",
-		required: [true, "User ref is required"]
-	},
-	transaction: {
-		type: mongoose.Schema.Types.ObjectId,
-		ref: "Transaction",
-		// required: [true, "Transaction is required"]
+		required: [true, "User ID is required"]
 	},
 	plan: {
 		type: mongoose.Schema.Types.ObjectId,
@@ -144,7 +139,18 @@ const warrantySchema = new mongoose.Schema({
 		type: String,
 		enum: ["awaited", "placed", "delivered"],
 		default: "awaited"
-	}
+	},
+	paypalID: {
+		type: String,
+		required: [true, "Paypal orderID is required."],
+		select: false
+	},
+	salePerson: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "User"
+	},
+	documents: [{type: "String"}],
+	comments: [{type: "String"}]
 }, { timestamps: true });
 
 const warrantyModel = mongoose.model('Warranty', warrantySchema);
