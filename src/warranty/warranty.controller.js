@@ -16,7 +16,6 @@ const { planModel } = require("../levels/level.model");
 // });
 
 exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
-
   console.log("Create Paypal Order");
   const data = await createOrder(req.body.amount);
   console.log({ data });
@@ -32,10 +31,9 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   const { order, warrantyData } = req.body;
 
   const captureData = await capturePayment(order.orderID);
-  console.log({ a: captureData.purchase_units[0].payments.captures[0].amount.value });
+  
   const warranty = await warrantyModel.create({ ...warrantyData, user: req.userId, paypalID: order.orderID });
   const plan = await planModel.findById(warranty.plan).populate("level");
-  console.log({plan});
   const transaction = await transactionModel.create({
     plan: plan.level.level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),

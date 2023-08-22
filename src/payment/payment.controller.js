@@ -2,6 +2,7 @@ const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const mongoose = require("mongoose");
 const warrantyModel = require("../warranty/warranty.model");
+const transactionModel = require("../transaction/transaction.model");
 
 exports.createPayment = catchAsyncError(async (req, res, next) => {
   const { vehicleDetails, level, address, start_date, userDetails } = req.body;
@@ -45,7 +46,35 @@ exports.createPayment = catchAsyncError(async (req, res, next) => {
 });
 
 exports.updateAfterPayment = catchAsyncError(async (req, res, next) => {
-
   console.log(req.body);
-  res.status(200).json({message: "Acknowledged."});
+  const { event_type, resource } = req.body;
+
+  try {
+    const { order_id } = resource?.supplementary_data?.related_ids;
+
+    var warranty = await warrantyModel.findOne({ paypalID: order_id });
+
+    switch (event_type) {
+      case 'PAYMENT.CAPTURE.COMPLETED':
+        await transactionModel.findOneAndUpdate({ warranty: warranty._id }, { status: "complete" });
+        break;
+      case 'PAYMENT.CAPTURE.DECLINED':
+        await transactionModel.findOneAndUpdate({ warranty: warranty._id }, { status: "fail" });
+        break;
+      // case 'PAYMENT.CAPTURE.PENDING':
+
+      //   break;
+
+      default:
+        break;
+    }
+
+    res.status(200).json({ message: "Payment Acknowledged." });
+
+  } catch (err) {
+    console.log({ error: err.message });
+
+    res.status(200).json({ message: "Order Approval Acknowledged." });
+  }
+  // res.status(200).json({message: "Acknoledged."})
 });
