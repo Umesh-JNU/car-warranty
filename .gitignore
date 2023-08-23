@@ -27,5 +27,4 @@ yarn-error.log*
 .netlify
 
 /package-lock.json
-/config/local.env
 /ngrok.exe
