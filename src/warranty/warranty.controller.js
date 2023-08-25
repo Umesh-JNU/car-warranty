@@ -2,7 +2,7 @@ const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const APIFeatures = require("../../utils/apiFeatures");
 const warrantyModel = require("./warranty.model");
-const { isValidObjectId } = require("mongoose");
+const { isValidObjectId, default: mongoose } = require("mongoose");
 const axios = require("axios");
 const { createOrder, capturePayment } = require("../../utils/paypal");
 const transactionModel = require("../transaction/transaction.model");
@@ -15,11 +15,40 @@ const { planModel } = require("../levels/level.model");
 //   res.status(201).json({ warranty });
 // });
 
+const evalLoad = (s, b, type) => {
+  let base_laod = 0;
+  if (b <= 300) base_laod = 50;
+  else if (b <= 400) base_laod = 150;
+  else base_laod = 350;
+
+  if (s <= 2500 && type !== '4x4') {
+    base_laod -= 50;
+  } else if (s > 2500 && type === '4x4') {
+    base_laod += 50;
+  }
+
+  return base_laod;
+}
+
 exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
-  console.log("Create Paypal Order");
-  const data = await createOrder(req.body.amount);
-  console.log({ data });
-  // console.log(data.links[0], data.links[1], data.links[2], data.links[3]);
+  console.log("Create Paypal Order", req.body);
+
+  const { eng_size, bhp, drive_type, planID } = req.body;
+  if (!eng_size || bhp <= 0 || !bhp || !drive_type || !planID) {
+    return next(new ErrorHandler("Bad Request", 400));
+  }
+
+  const plan = await planModel.findById(planID);
+  if(!plan) {
+    return next(new ErrorHandler("Plan not found.", 400))
+  }
+
+  const loadPercent = evalLoad(eng_size, bhp, drive_type);
+  const ttl = plan.price + loadPercent;
+  console.log({ plan, loadPercent, ttl });
+
+  const data = await createOrder(ttl);
+
   if (data.status !== 'CREATED')
     return next(new ErrorHandler('Something went wrong', 500));
 
@@ -30,8 +59,10 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   console.log("createWarranty as onApprove", req.body)
   const { order, warrantyData } = req.body;
 
+  // capture payment
   const captureData = await capturePayment(order.orderID);
-  
+
+  // after that warranty and transaction will be created
   const warranty = await warrantyModel.create({ ...warrantyData, user: req.userId, paypalID: order.orderID });
   const plan = await planModel.findById(warranty.plan).populate("level");
   const transaction = await transactionModel.create({

@@ -56,7 +56,7 @@ exports.createOrder = async (amount) => {
   };
 
   const { data } = await axios.post(`${url}/v2/checkout/orders`, body, config);
-
+  console.log("inside create Order", {data})
   return data;
 }
 

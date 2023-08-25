@@ -181,6 +181,12 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
         }
       }
     },
+    {
+      $project: {
+        _id: 1,
+        plans: { $sortArray: { input: "$plans", sortBy: { price: 1 } } }
+      }
+    },
     //   {
     //     "levelsAndPlans": [
     //         {
@@ -251,8 +257,18 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
       }
     },
     {
-      $sort: {plansByClaim: 1}
-    }
+      $project: {
+        _id: 1,
+        level: 1,
+        max_age: 1,
+        max_mileage: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        __v: 1,
+        plansByClaim: { $sortArray: { input: "$plansByClaim", sortBy: { claim: 1 } } }
+      }
+    },
+    { $sort: { level: 1 } }
   ]);
 
   res.status(200).json({ levelsAndPlans, load_per });

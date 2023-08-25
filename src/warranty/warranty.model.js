@@ -145,6 +145,11 @@ const warrantySchema = new mongoose.Schema({
 		required: [true, "Paypal orderID is required."],
 		select: false
 	},
+	payment: {
+		type: Boolean,
+		default: false,
+		select: false,
+	},
 	salePerson: {
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "User"
