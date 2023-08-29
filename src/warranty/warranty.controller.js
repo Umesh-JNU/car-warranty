@@ -8,12 +8,12 @@ const { createOrder, capturePayment } = require("../../utils/paypal");
 const transactionModel = require("../transaction/transaction.model");
 const { planModel } = require("../levels/level.model");
 
-// Create a new document
-// exports.createWarranty = catchAsyncError(async (req, res, next) => {
-//   console.log("warranty create", req.body);
-//   const warranty = await warrantyModel.create({ ...req.body, user: req.userId });
-//   res.status(201).json({ warranty });
-// });
+const calcExpiryDate = async ({ plan: planID, start_date }) => {
+  const plan = await planModel.findById(planID).populate("level");
+  const d1 = new Date(start_date);
+  const d2 = new Date(start_date).setMonth(d1.getMonth() + plan.month);
+  return { expiry_date, level: plan.level.level };
+};
 
 const evalLoad = (s, b, type) => {
   let base_laod = 0;
@@ -30,6 +30,15 @@ const evalLoad = (s, b, type) => {
   return base_laod;
 }
 
+// Create a new document
+// exports.create = catchAsyncError(async (req, res, next) => {
+//   console.log("warranty create", req.body);
+//   const expiry_date = await calcExpiryDate(req.body);
+//   console.log({expiry_date})
+//   const warranty = await warrantyModel.create({ ...req.body, expiry_date, user: req.userId });
+//   res.status(201).json({ warranty });
+// });
+
 exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
   console.log("Create Paypal Order", req.body);
 
@@ -39,7 +48,7 @@ exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
   }
 
   const plan = await planModel.findById(planID);
-  if(!plan) {
+  if (!plan) {
     return next(new ErrorHandler("Plan not found.", 400))
   }
 
@@ -63,10 +72,11 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   const captureData = await capturePayment(order.orderID);
 
   // after that warranty and transaction will be created
-  const warranty = await warrantyModel.create({ ...warrantyData, user: req.userId, paypalID: order.orderID });
-  const plan = await planModel.findById(warranty.plan).populate("level");
+  const { expiry_date, level } = await calcExpiryDate(warrantyData);
+  console.log({ expiry_date })
+  const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId, paypalID: order.orderID });
   const transaction = await transactionModel.create({
-    plan: plan.level.level,
+    plan: level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
     warranty: warranty._id
   });
@@ -79,15 +89,33 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
 // user's all warranties
 exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   const userId = req.userId;
-  const warranties = await warrantyModel.find({ user: userId }).select("-user");
+  let query = { user: userId };
+  if (req.query.active) {
+    const today = new Date();
+    query = {
+      ...query,
+      start_date: { $lte: today },
+      expiry_date: { $gte: today }
+    }
+  }
+  const warranties = await warrantyModel.find(query).populate({
+    path: "plan",
+    populate: { path: "level" }
+  }).select("-user");
   res.status(200).json({ warranties });
 });
 
 // Get all documents
 exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   console.log("get all warranties", req.query);
+
+  let query = {};
+  if (req?.user?.role === 'sale-person') {
+    query = { salePerson: req.userId }
+  }
+
   const apiFeature = new APIFeatures(
-    warrantyModel.find().sort({ createdAt: -1 }).populate({
+    warrantyModel.find(query).sort({ createdAt: -1 }).populate({
       path: "plan",
       populate: { path: "level" }
     }), req.query).search("plan");
@@ -111,7 +139,7 @@ exports.getWarranty = catchAsyncError(async (req, res, next) => {
   if (!req.user) {
     var warranty = await warrantyModel.findOne({ _id: id, user: req.userId }).select("-user");
   } else {
-    var warranty = await warrantyModel.findById(id);
+    var warranty = await warrantyModel.findById(id).populate([{ path: "plan", populate: { path: "level" } }, { path: "user" }]);
   }
 
   if (!warranty) {
@@ -123,6 +151,7 @@ exports.getWarranty = catchAsyncError(async (req, res, next) => {
 
 // Update a document by ID
 exports.updateWarranty = catchAsyncError(async (req, res, next) => {
+  console.log("update warranty", req.body)
   const { id } = req.params;
   const warranty = await warrantyModel.findByIdAndUpdate(id, req.body, {
     new: true,

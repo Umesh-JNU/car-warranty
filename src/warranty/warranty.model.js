@@ -42,61 +42,10 @@ const vehicleDetailSchema = new mongoose.Schema({
 	},
 });
 
-const userDetailSchema = new mongoose.Schema({
-	email: {
-		type: String,
-		required: [true, "Email is required."],
-		validate: [validateEmail, "Invalid user's email address."]
-	},
-	firstname: {
-		type: String,
-		required: [true, 'First name is required.']
-	},
-	lastname: {
-		type: String,
-		required: [true, 'Last name is required.']
-	},
-	mobile_no: {
-		type: String,
-		required: [true, 'Mobile number is required.']
-	},
-});
-
-const addressSchema = new mongoose.Schema({
-	postcode: {
-		type: String,
-		required: [true, "Post code is required."],
-	},
-	addr_line1: {
-		type: String,
-		required: [true, "Address line is required."],
-	},
-	addr_line2: {
-		type: String,
-		required: [true, "Address Line is required."],
-	},
-	city: {
-		type: String,
-		required: [true, "City is required."],
-	},
-	country: {
-		type: String,
-		required: [true, "Country is required."],
-	},
-});
-
 const vehicleInfoSchema = new mongoose.Schema({
 	purchase_date: {
 		type: Date,
 		required: [true, "Vehicle's purchase date is required."]
-	},
-	mot_due_date: {
-		type: Date,
-		required: [true, 'MOT date is required.']
-	},
-	last_service_date: {
-		type: Date,
-		required: [true, 'Last service date is required.']
 	},
 	service_history: {
 		type: Boolean,
@@ -109,17 +58,13 @@ const warrantySchema = new mongoose.Schema({
 		type: vehicleDetailSchema,
 		required: [true, "Vehicle detail is required."]
 	},
-	userDetails: {
-		type: userDetailSchema,
-		required: [true, "User detail is required."]
-	},
-	address: {
-		type: addressSchema,
-		required: [true, "Address is required."]
-	},
 	start_date: {
 		type: Date,
 		required: [true, "Plan Start Date is required."],
+	},
+	expiry_date: {
+		type: Date,
+		required: [true, "Plan Expiry Date is required."],
 	},
 	vehicleInfo: {
 		type: vehicleInfoSchema,
@@ -142,7 +87,7 @@ const warrantySchema = new mongoose.Schema({
 	},
 	paypalID: {
 		type: String,
-		required: [true, "Paypal orderID is required."],
+		// required: [true, "Paypal orderID is required."],
 		select: false
 	},
 	payment: {
@@ -152,10 +97,14 @@ const warrantySchema = new mongoose.Schema({
 	},
 	salePerson: {
 		type: mongoose.Schema.Types.ObjectId,
-		ref: "User"
+		ref: "User",
+		select: false
 	},
-	documents: [{type: "String"}],
-	comments: [{type: "String"}]
+	documents: [{
+		url: { type: String },
+		desc: { type: String }
+	}],
+	comments: [{ type: String }]
 }, { timestamps: true });
 
 const warrantyModel = mongoose.model('Warranty', warrantySchema);

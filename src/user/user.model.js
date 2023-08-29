@@ -13,6 +13,21 @@ const validatePassword = (password) => {
 	return re.test(password);
 };
 
+const addrSchema = new mongoose.Schema({
+	address: {
+		type: String,
+		required: [true, "Address is required."]
+	},
+	city: {
+		type: String,
+		required: [true, "City is required."]
+	},
+	postcode: {
+		type: String,
+		required: [true, "Postcode is required."]
+	},
+});
+
 const userSchema = new mongoose.Schema({
 	email: {
 		type: String,
@@ -26,10 +41,23 @@ const userSchema = new mongoose.Schema({
 		minLength: [8, "Password must have at least 8 characters."],
 		select: false,
 	},
-	firstname: { type: String },
-	lastname: { type: String },
-	mobile_no: { type: String },
+	firstname: {
+		type: String,
+		required: [true, "Firstname is required."]
+	},
+	lastname: {
+		type: String,
+		required: [true, "Lastname is required."]
+	},
+	mobile_no: {
+		type: String,
+		required: [true, "Mobile number is required."]
+	},
 	profile_img: { type: String },
+	addr: {
+		type: addrSchema,
+		required: [true, "Address, city and postcode is required."]
+	},
 	role: {
 		type: String,
 		default: "user",

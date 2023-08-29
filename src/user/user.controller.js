@@ -20,10 +20,9 @@ const userUpdate = async (id, info, res, next) => {
 }
 // Create a new document
 exports.createUser = catchAsyncError(async (req, res, next) => {
-  const { email } = req.body;
   const password = passwordGenerator();
 
-  const userDetails = { email, password };
+  const userDetails = { ...req.body, password };
   const user = await userModel.create(userDetails);
   if (!user) {
     return next(new ErrorHandler("Something Went Wrong. Please try again.", 500));
@@ -65,7 +64,10 @@ exports.login = catchAsyncError(async (req, res, next) => {
 
   const user = await userModel.findOne({ email }).select("+password");
   if (!user) {
-    return next(new ErrorHandler("Email is not registered with us. Please continue as guest.", 401));
+    var message = "Email is not registered with us. Please continue as guest.";
+    if (req.query.admin)
+      var message = "Invalid Credentials."
+    return next(new ErrorHandler(message, 401));
   }
 
   const isPasswordMatched = await user.comparePassword(password);
@@ -135,7 +137,7 @@ exports.getAllUser = catchAsyncError(async (req, res, next) => {
   if (req.query.role) {
     role = { role: req.query.role };
   }
-  
+
   const apiFeature = new APIFeatures(
     userModel.find(role).sort({ createdAt: -1 }),
     req.query

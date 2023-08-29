@@ -19,9 +19,10 @@ app.use(
 
 app.get("/", (req, res, next) => res.json({ message: "Server is running" }));
 
-const { adminRoute, userRoute, levelRoute, warrantyRoute, transactionRoute, paymentRoute } = require("./src");
+const { adminRoute, salePersonRoute, userRoute, levelRoute, warrantyRoute, transactionRoute, paymentRoute } = require("./src");
 
 app.use("/api/admin", adminRoute);
+app.use("/api/sale-person", salePersonRoute);
 app.use("/api/user", userRoute);
 app.use("/api/level", levelRoute);
 app.use("/api/warranty", warrantyRoute);
