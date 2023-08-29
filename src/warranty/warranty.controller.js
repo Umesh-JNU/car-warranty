@@ -12,7 +12,7 @@ const calcExpiryDate = async ({ plan: planID, start_date }) => {
   const plan = await planModel.findById(planID).populate("level");
   const d1 = new Date(start_date);
   const d2 = new Date(start_date).setMonth(d1.getMonth() + plan.month);
-  return { expiry_date, level: plan.level.level };
+  return { expiry_date: d2, level: plan.level.level };
 };
 
 const evalLoad = (s, b, type) => {
@@ -68,12 +68,15 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   console.log("createWarranty as onApprove", req.body)
   const { order, warrantyData } = req.body;
 
+  if(!order || !warrantyData) {
+    return next(new ErrorHandler("Bad Request", 400));
+  }
   // capture payment
   const captureData = await capturePayment(order.orderID);
 
   // after that warranty and transaction will be created
   const { expiry_date, level } = await calcExpiryDate(warrantyData);
-  console.log({ expiry_date })
+  console.log({ expiry_date, level })
   const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId, paypalID: order.orderID });
   const transaction = await transactionModel.create({
     plan: level,
