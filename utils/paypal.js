@@ -56,7 +56,7 @@ exports.createOrder = async (amount) => {
   };
 
   const { data } = await axios.post(`${url}/v2/checkout/orders`, body, config);
-  console.log("inside create Order", {data})
+  console.log("inside create Order", { data })
   return data;
 }
 
@@ -76,3 +76,19 @@ exports.capturePayment = async (orderID) => {
 
   return data;
 }
+
+exports.generateClientToken = async () => {
+  const access_token = await generateAccessToken();
+
+  const config = {
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+      "Accept-Language": "en_US",
+      "Content-Type": "application/json",
+    }
+  }
+  const { data } = await axios.post(`${url}/v1/identity/generate-token`, {}, config);
+
+  return data;
+};
+

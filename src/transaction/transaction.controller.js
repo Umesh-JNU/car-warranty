@@ -2,6 +2,7 @@ const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const APIFeatures = require("../../utils/apiFeatures");
 const transactionModel = require("./transaction.model");
+const { isValidObjectId } = require("mongoose");
 
 
 // Create a new document
@@ -12,15 +13,30 @@ exports.createTransaction = catchAsyncError(async (req, res, next) => {
 
 // Get all documents
 exports.getAllTransaction = catchAsyncError(async (req, res, next) => {
-  const transactions = await transactionModel.find();
+  console.log("get all transactions")
+  if(!req.user) {
+    const userId = req.userId;
+    var transactions = await transactionModel.find({user: userId}).sort({ createdAt: -1 }).select("-user");
+  } else {
+    var transactions = await transactionModel.find();
+  }
   res.status(200).json({ transactions });
 });
+
 
 // Get a single document by ID
 exports.getTransaction = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
+  if(!isValidObjectId(id)) {
+    return next(new ErrorHandler("Invalid Transaction ID", 400));
+  }
 
-  const transaction = await transactionModel.findById(id);
+  if (!req.user) {
+    var transaction = await transactionModel.findOne({ _id: id, user: req.userId }).select("-user");
+  } else {
+    var transaction = await transactionModel.findById(id);
+  }
+
   if (!transaction) {
     return next(new ErrorHandler("Transaction not found.", 404));
   }

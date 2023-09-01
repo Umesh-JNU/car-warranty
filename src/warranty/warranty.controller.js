@@ -30,6 +30,25 @@ const evalLoad = (s, b, type) => {
   return base_laod;
 }
 
+function maskString(inputString) {
+  if (typeof inputString !== 'string' || inputString.length < 4) {
+    // Input is not a valid string or too short to mask
+    return inputString;
+  }
+
+  // Extract the first two characters and the last two characters
+  const prefix = inputString.slice(0, 2);
+  const suffix = inputString.slice(-2);
+
+  // Calculate the number of asterisks needed
+  const numAsterisks = inputString.length - 4;
+  const maskedChars = '*'.repeat(numAsterisks);
+
+  // Combine the prefix, masked characters, and suffix
+  const maskedString = prefix + maskedChars + suffix;
+
+  return maskedString;
+}
 // Create a new document
 // exports.create = catchAsyncError(async (req, res, next) => {
 //   console.log("warranty create", req.body);
@@ -61,27 +80,37 @@ exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
   if (data.status !== 'CREATED')
     return next(new ErrorHandler('Something went wrong', 500));
 
-  res.status(200).json({ orderID: data.id });
+  res.status(200).json({ data, orderID: data.id });
 });
 
 exports.createWarranty = catchAsyncError(async (req, res, next) => {
   console.log("createWarranty as onApprove", req.body)
   const { order, warrantyData } = req.body;
 
-  if(!order || !warrantyData) {
+  if (!order || !warrantyData) {
     return next(new ErrorHandler("Bad Request", 400));
   }
   // capture payment
   const captureData = await capturePayment(order.orderID);
-
+  const {payment_source} = captureData;
+  
+  if(payment_source.paypal) {
+    var method = "paypal"
+    var source_id = payment_source.paypal.account_id;
+  } else if(payment_source.card) {
+    var method = "card"
+    var source_id = payment_source.card.last_digits;
+  }
   // after that warranty and transaction will be created
   const { expiry_date, level } = await calcExpiryDate(warrantyData);
   console.log({ expiry_date, level })
   const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId, paypalID: order.orderID });
   const transaction = await transactionModel.create({
+    method, source_id,
     plan: level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
-    warranty: warranty._id
+    warranty: warranty._id,
+    user: req.userId
   });
   console.log({ captureData });
 
@@ -91,6 +120,7 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
 
 // user's all warranties
 exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
+  console.log("my warranties");
   const userId = req.userId;
   let query = { user: userId };
   if (req.query.active) {
@@ -101,6 +131,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
       expiry_date: { $gte: today }
     }
   }
+  console.log({ query })
   const warranties = await warrantyModel.find(query).populate({
     path: "plan",
     populate: { path: "level" }
@@ -112,28 +143,32 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
 exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   console.log("get all warranties", req.query);
 
-  let query = {};
   if (req?.user?.role === 'sale-person') {
-    query = { salePerson: req.userId }
+    var apiFeature = new APIFeatures(
+      warrantyModel.find({ salePerson: req.userId }).sort({ createdAt: -1 }).populate([
+        { path: "plan", populate: { path: "level" } },
+        { path: "user" },
+      ]), req.query).search("plan");
+  }
+  else {
+    var apiFeature = new APIFeatures(
+      warrantyModel.find().sort({ createdAt: -1 }).populate([
+        { path: "plan", populate: { path: "level" } },
+        { path: "user" },
+        { path: "salePerson", select: "firstname lastname" }
+      ]), req.query).search("plan");
   }
 
-  const apiFeature = new APIFeatures(
-    warrantyModel.find(query).sort({ createdAt: -1 }).populate({
-      path: "plan",
-      populate: { path: "level" }
-    }), req.query).search("plan");
-
   let warranties = await apiFeature.query;
-  console.log("warranties", warranties);
-  let filteredWarrantyCount = warranties.length;
+  let warrantyCount = warranties.length;
   if (req.query.resultPerPage && req.query.currentPage) {
     apiFeature.pagination();
 
-    console.log("filteredWarrantyCount", filteredWarrantyCount);
-    users = await apiFeature.query.clone();
+    console.log("warrantyCount", warrantyCount);
+    warranties = await apiFeature.query.clone();
   }
   console.log("warranties", warranties);
-  res.status(200).json({ warranties, filteredWarrantyCount });
+  res.status(200).json({ warranties, warrantyCount });
 });
 
 // Get a single document by ID
@@ -154,14 +189,19 @@ exports.getWarranty = catchAsyncError(async (req, res, next) => {
 
 // Update a document by ID
 exports.updateWarranty = catchAsyncError(async (req, res, next) => {
-  console.log("update warranty", req.body)
-  const { id } = req.params;
-  const warranty = await warrantyModel.findByIdAndUpdate(id, req.body, {
+  const option = {
     new: true,
     runValidators: true,
     useFindAndModify: false,
-  });
+  };
 
+  console.log("update warranty", req.body)
+  const { id } = req.params;
+  if (req.user.role === 'sale-person') {
+    var warranty = await warrantyModel.findOneAndUpdate({ _id: id, salePerson: req.user._id }, req.body, option)
+  } else {
+    var warranty = await warrantyModel.findByIdAndUpdate(id, req.body, option);
+  }
   if (!warranty) return next(new ErrorHandler('Warranty not found', 404));
 
   res.status(200).json({ warranty });

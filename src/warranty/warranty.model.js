@@ -82,8 +82,8 @@ const warrantySchema = new mongoose.Schema({
 	},
 	status: {
 		type: String,
-		enum: ["awaited", "placed", "delivered"],
-		default: "awaited"
+		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered", "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
+		default: "inspection-awaited"
 	},
 	paypalID: {
 		type: String,

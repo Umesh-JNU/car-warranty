@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 
 const transactionSchema = new mongoose.Schema({
+	method: {
+		type: String,
+		required: [true, "Payment method is required."]
+	},
+	source_id: {
+		type: String,
+		required: [true, "Source ID is required."]
+	},
 	plan: {
 		type: String,
 		enum: ['safe', 'secure', 'supreme'],
@@ -14,6 +22,16 @@ const transactionSchema = new mongoose.Schema({
 		type: String,
 		default: 'pending',
 		enum: ['pending', 'fail', 'complete']
+	},
+	type: {
+		type: String,
+		enum: ["credit", "debit"],
+		default: "credit",
+	},
+	user: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "User",
+		required: [true, "User ID is required."]
 	},
 	warranty: {
 		type: mongoose.Schema.Types.ObjectId,
