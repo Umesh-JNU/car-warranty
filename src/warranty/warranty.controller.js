@@ -92,12 +92,12 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   }
   // capture payment
   const captureData = await capturePayment(order.orderID);
-  const {payment_source} = captureData;
-  
-  if(payment_source.paypal) {
+  const { payment_source } = captureData;
+
+  if (payment_source.paypal) {
     var method = "paypal"
     var source_id = payment_source.paypal.account_id;
-  } else if(payment_source.card) {
+  } else if (payment_source.card) {
     var method = "card"
     var source_id = payment_source.card.last_digits;
   }
@@ -118,32 +118,139 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ captureData });
 });
 
-// user's all warranties
+const myWarranties = async (userId, query) => {
+  const result = await warrantyModel.aggregate([
+    { $match: { user: new mongoose.Types.ObjectId(userId) } },
+    {
+      $lookup: {
+        from: "plans",
+        localField: "plan",
+        foreignField: "_id",
+        as: "plan"
+      }
+    },
+    { $unwind: "$plan" },
+    {
+      $lookup: {
+        from: "levels",
+        localField: "plan.level",
+        foreignField: "_id",
+        as: "plan.level"
+      }
+    },
+    { $unwind: "$plan.level" },
+    ...query
+  ]);
+
+  return result;
+};
+
 exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
-  console.log("my warranties");
-  const userId = req.userId;
-  let query = { user: userId };
+  console.log("User's all warranty")
+
   if (req.query.active) {
     const today = new Date();
-    query = {
-      ...query,
-      start_date: { $lte: today },
-      expiry_date: { $gte: today }
+
+    var [result] = await myWarranties(req.userId, [
+      {
+        $project: {
+          _id: 1,
+          start_date: 1,
+          expiry_date: 1,
+          plan: "$plan.level.level",
+          status: 1,
+          remaining_days: {
+            $dateDiff: {
+              startDate: today,
+              endDate: "$expiry_date",
+              unit: "day"
+            }
+          },
+          createdAt: 1,
+          updatedAt: 1,
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          warranties: { $push: "$$ROOT" },
+          active: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $lte: ['$start_date', today] },
+                    { $gte: ['$expiry_date', today] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          upcoming: {
+            $sum: {
+              $cond: [
+                { $gt: ['$start_date', today] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          warranties: 1,
+          active: 1,
+          upcoming: 1
+        }
+      }
+    ]);
+  } else {
+    var result = {
+      warranties: await myWarranties(req.userId, [
+        {
+          $lookup: {
+            from: "transactions",
+            localField: "_id",
+            foreignField: "warranty",
+            as: "transaction"
+          }
+        },
+        { $unwind: "$transaction" },
+        {
+          $project: {
+            _id: 1,
+            start_date: 1,
+            expiry_date: 1,
+            plan: "$plan.level.level",
+            amount: "$transaction.amount",
+            status: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          }
+        }
+      ])
     }
   }
-  console.log({ query })
-  const warranties = await warrantyModel.find(query).populate({
-    path: "plan",
-    populate: { path: "level" }
-  }).select("-user");
-  res.status(200).json({ warranties });
+  res.status(200).json(result)
 });
 
 // Get all documents
 exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   console.log("get all warranties", req.query);
-
-  if (req?.user?.role === 'sale-person') {
+  // for user
+  if (req.user?.role === 'admin') {
+    var apiFeature = new APIFeatures(
+      warrantyModel.find().sort({ createdAt: -1 }).populate([
+        { path: "plan", populate: { path: "level" } },
+        { path: "user" },
+        { path: "salePerson", select: "firstname lastname" }
+      ]), req.query).search("plan");
+  }
+  else if (req.user?.role === 'sale-person') {
     var apiFeature = new APIFeatures(
       warrantyModel.find({ salePerson: req.userId }).sort({ createdAt: -1 }).populate([
         { path: "plan", populate: { path: "level" } },
@@ -151,12 +258,7 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
       ]), req.query).search("plan");
   }
   else {
-    var apiFeature = new APIFeatures(
-      warrantyModel.find().sort({ createdAt: -1 }).populate([
-        { path: "plan", populate: { path: "level" } },
-        { path: "user" },
-        { path: "salePerson", select: "firstname lastname" }
-      ]), req.query).search("plan");
+    return next(new ErrorHandler("Bad Request", 400));
   }
 
   let warranties = await apiFeature.query;
@@ -165,8 +267,9 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
     apiFeature.pagination();
 
     console.log("warrantyCount", warrantyCount);
-    warranties = await apiFeature.query.clone();
   }
+
+  warranties = await apiFeature.query.clone();
   console.log("warranties", warranties);
   res.status(200).json({ warranties, warrantyCount });
 });
@@ -175,7 +278,10 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
 exports.getWarranty = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
   if (!req.user) {
-    var warranty = await warrantyModel.findOne({ _id: id, user: req.userId }).select("-user");
+    var warranty = await warrantyModel.findOne({ _id: id, user: req.userId }).populate([
+      { path: "user", select: "firstname lastname email mobile_no" },
+      { path: "plan", select: "level", populate: { path: "level", select: "level" } }
+    ]);
   } else {
     var warranty = await warrantyModel.findById(id).populate([{ path: "plan", populate: { path: "level" } }, { path: "user" }]);
   }
