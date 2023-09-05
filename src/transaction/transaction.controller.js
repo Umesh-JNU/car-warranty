@@ -14,27 +14,36 @@ exports.createTransaction = catchAsyncError(async (req, res, next) => {
 // Get all documents
 exports.getAllTransaction = catchAsyncError(async (req, res, next) => {
   console.log("get all transactions")
-  if(!req.user) {
+  if (!req.user) {
     const userId = req.userId;
-    var transactions = await transactionModel.find({user: userId}).sort({ createdAt: -1 }).select("-user");
+    var transactions = await transactionModel.find({ user: userId }).sort({ createdAt: -1 }).select("-user");
   } else {
-    var transactions = await transactionModel.find();
+    const apiFeature = new APIFeatures(transactionModel.find().sort({ createdAt: -1 }).populate("user"), req.query).search("plan");
+    var transactions = await apiFeature.query;
+    var transactionsCount = transactions.length;
+    if (req.query.resultPerPage && req.query.currentPage) {
+      apiFeature.pagination();
+
+      console.log("transactionsCount", transactionsCount);
+    }
+
+    transactions = await apiFeature.query.clone();
   }
-  res.status(200).json({ transactions });
+  res.status(200).json({ transactions, transactionsCount });
 });
 
 
 // Get a single document by ID
 exports.getTransaction = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
-  if(!isValidObjectId(id)) {
+  if (!isValidObjectId(id)) {
     return next(new ErrorHandler("Invalid Transaction ID", 400));
   }
 
   if (!req.user) {
     var transaction = await transactionModel.findOne({ _id: id, user: req.userId }).select("-user");
   } else {
-    var transaction = await transactionModel.findById(id);
+    var transaction = await transactionModel.findById(id).populate("user", "firstname lastname email mobile_no");
   }
 
   if (!transaction) {

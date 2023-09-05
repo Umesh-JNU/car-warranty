@@ -16,7 +16,7 @@ exports.createLevel = catchAsyncError(async (req, res, next) => {
 exports.getAllLevel = catchAsyncError(async (req, res, next) => {
   console.log("Get all levels", req.query);
   const levels = await levelModel.find();
-  res.status(200).json(levels);
+  res.status(200).json({levels});
 });
 
 // Get a single document by ID

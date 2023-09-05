@@ -118,27 +118,31 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ captureData });
 });
 
+const populatePlanLevel = [
+  {
+    $lookup: {
+      from: "plans",
+      localField: "plan",
+      foreignField: "_id",
+      as: "plan"
+    }
+  },
+  { $unwind: "$plan" },
+  {
+    $lookup: {
+      from: "levels",
+      localField: "plan.level",
+      foreignField: "_id",
+      as: "plan.level"
+    }
+  },
+  { $unwind: "$plan.level" },
+];
+
 const myWarranties = async (userId, query) => {
   const result = await warrantyModel.aggregate([
     { $match: { user: new mongoose.Types.ObjectId(userId) } },
-    {
-      $lookup: {
-        from: "plans",
-        localField: "plan",
-        foreignField: "_id",
-        as: "plan"
-      }
-    },
-    { $unwind: "$plan" },
-    {
-      $lookup: {
-        from: "levels",
-        localField: "plan.level",
-        foreignField: "_id",
-        as: "plan.level"
-      }
-    },
-    { $unwind: "$plan.level" },
+    ...populatePlanLevel,
     ...query
   ]);
 
@@ -202,12 +206,27 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
       {
         $project: {
           _id: 0,
-          warranties: 1,
+          warranties: {
+            $filter: {
+              input: "$warranties",
+              as: "warranty",
+              cond: {
+                $and: [
+                  { $lte: ['$$warranty.start_date', today] },
+                  { $gte: ['$$warranty.expiry_date', today] }
+                ]
+              }
+            }
+          },
           active: 1,
           upcoming: 1
         }
-      }
+      },
     ]);
+
+    if (!result) {
+      return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [] })
+    }
   } else {
     var result = {
       warranties: await myWarranties(req.userId, [
@@ -234,49 +253,102 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
         }
       ])
     }
+
+    if (!result) {
+      return res.status(200).json({ warranties: [] });
+    }
   }
+  console.log(result);
   res.status(200).json(result)
 });
 
 // Get all documents
 exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   console.log("get all warranties", req.query);
+
+  const { keyword, currentPage, resultPerPage } = req.query;
+
+  const queryOptions = [];
+  if (keyword) {
+    queryOptions.push({ $match: { "plan.level.level": req.query.keyword } });
+  }
+
+  if (currentPage && resultPerPage) {
+    const r = parseInt(resultPerPage);
+    const c = parseInt(currentPage);
+
+    const skip = r * (c - 1);
+    queryOptions.push({ $skip: skip });
+    queryOptions.push({ $limit: r });
+  }
+
   // for user
   if (req.user?.role === 'admin') {
-    var apiFeature = new APIFeatures(
-      warrantyModel.find().sort({ createdAt: -1 }).populate([
-        { path: "plan", populate: { path: "level" } },
-        { path: "user" },
-        { path: "salePerson", select: "firstname lastname" }
-      ]), req.query).search("plan");
+    var warranties = await warrantyModel.aggregate([
+      ...populatePlanLevel,
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "user",
+        }
+      },
+      { $unwind: "$user" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "salePerson",
+          foreignField: "_id",
+          as: "salePerson",
+        }
+      },
+      { $unwind: { path: "$salePerson", preserveNullAndEmptyArrays: true } },
+      { $sort: { createdAt: -1 } },
+      ...queryOptions
+    ]);
   }
   else if (req.user?.role === 'sale-person') {
-    var apiFeature = new APIFeatures(
-      warrantyModel.find({ salePerson: req.userId }).sort({ createdAt: -1 }).populate([
-        { path: "plan", populate: { path: "level" } },
-        { path: "user" },
-      ]), req.query).search("plan");
+    var warranties = await warrantyModel.aggregate([
+      {$match: {salePerson: new mongoose.Types.ObjectId(req.userId)}},
+      ...populatePlanLevel,
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "user",
+        }
+      },
+      { $unwind: "$user" },
+      { $sort: { createdAt: -1 } },
+      ...queryOptions
+    ]);
   }
   else {
     return next(new ErrorHandler("Bad Request", 400));
   }
 
-  let warranties = await apiFeature.query;
+  // var warranties = await apiFeature.query;
   let warrantyCount = warranties.length;
-  if (req.query.resultPerPage && req.query.currentPage) {
-    apiFeature.pagination();
+  // if (req.query.resultPerPage && req.query.currentPage) {
+  //   apiFeature.pagination();
 
-    console.log("warrantyCount", warrantyCount);
-  }
+  //   console.log("warrantyCount", warrantyCount);
+  // }
 
-  warranties = await apiFeature.query.clone();
-  console.log("warranties", warranties);
+  // warranties = await apiFeature.query.clone();
+  // console.log("warranties", warranties);
   res.status(200).json({ warranties, warrantyCount });
 });
 
 // Get a single document by ID
 exports.getWarranty = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return next(new ErrorHandler("Invalid Warranty ID.", 400));
+  }
+
   if (!req.user) {
     var warranty = await warrantyModel.findOne({ _id: id, user: req.userId }).populate([
       { path: "user", select: "firstname lastname email mobile_no" },

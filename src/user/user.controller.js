@@ -5,7 +5,10 @@ const APIFeatures = require("../../utils/apiFeatures");
 const { passwordGenerator } = require("../../utils/randGenerator");
 const sendEmail = require("../../utils/sendEmail");
 const userModel = require("./user.model");
+const transactionModel = require("../transaction/transaction.model");
+const warrantyModel = require("../warranty/warranty.model");
 const path = require('path');
+const { default: mongoose } = require('mongoose');
 
 const userUpdate = async (id, info, res, next) => {
   console.log({ id, info });
@@ -82,7 +85,61 @@ exports.login = catchAsyncError(async (req, res, next) => {
 exports.getUser = catchAsyncError(async (req, res, next) => {
   const { id } = req.params;
   const userId = req.userId;
-  const user = await userModel.findById(id ? id : userId);
+  if (req.query.task) {
+    console.log({ "jere": "Fgdfgd" })
+    var [user] = await userModel.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(id) } },
+      {
+        $lookup: {
+          from: "warranties",
+          localField: "_id",
+          foreignField: "salePerson",
+          pipeline: [
+            {
+              $lookup: {
+                from: "plans",
+                localField: "plan",
+                foreignField: "_id",
+                as: "plan"
+              }
+            },
+            { $unwind: "$plan" },
+            {
+              $lookup: {
+                from: "levels",
+                localField: "plan.level",
+                foreignField: "_id",
+                as: "plan.level"
+              }
+            },
+            { $unwind: "$plan.level" },
+            {
+              $lookup: {
+                from: "users",
+                localField: "user",
+                foreignField: "_id",
+                as: "user"
+              }
+            },
+            { $unwind: "$user" },
+            {
+              $project: {
+                _id: 1,
+                user: 1,
+                plan: "$plan.level.level",
+                vehicleDetails: 1,
+                status: 1,
+              }
+            }
+          ],
+          as: "warranties"
+        }
+      }
+    ]);
+  } else {
+    var user = await userModel.findById(id ? id : userId);
+  }
+
   if (!user) {
     return next(new ErrorHandler("User not found.", 404));
   }
@@ -145,15 +202,15 @@ exports.getAllUser = catchAsyncError(async (req, res, next) => {
 
   let users = await apiFeature.query;
   console.log("users", users);
-  let filteredUserCount = users.length;
+  let usersCount = users.length;
   if (req.query.resultPerPage && req.query.currentPage) {
     apiFeature.pagination();
 
-    console.log("filteredUserCount", filteredUserCount);
+    console.log("usersCount", usersCount);
     users = await apiFeature.query.clone();
   }
   console.log("users", users);
-  res.status(200).json({ users, filteredUserCount });
+  res.status(200).json({ users, usersCount });
 });
 
 // create sale person
@@ -163,6 +220,20 @@ exports.createSalePerson = catchAsyncError(async (req, res, next) => {
   res.status(200).json({ salePerson });
 })
 
+exports.deleteSalePerson = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  let user = await userModel.findById(id);
+
+  if (!user)
+    return next(new ErrorHandler("Sale Person not found", 404));
+
+  await warrantyModel.updateMany({ salePerson: user._id }, { salePerson: null });
+  await user.deleteOne();
+
+  res.status(200).json({
+    message: "Sale Person Deleted successfully.",
+  });
+});
 
 
 // Delete a document by ID
@@ -173,6 +244,8 @@ exports.deleteUser = catchAsyncError(async (req, res, next) => {
   if (!user)
     return next(new ErrorHandler("User not found", 404));
 
+  await transactionModel.deleteMany({ user: user._id });
+  await warrantyModel.deleteMany({ user: user._id });
   await user.deleteOne();
 
   res.status(200).json({

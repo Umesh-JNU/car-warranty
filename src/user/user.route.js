@@ -9,10 +9,4 @@ router.get("/profile", auth, getUser);
 router.put("/update-profile", auth, updateProfile);
 router.put("/update-password", auth, updatePassword);
 
-router.get("/", getAllUser);
-router.route("/:id")
-  .get(getUser)
-  .put(updateUser)
-  .delete(deleteUser);
-
 module.exports = router;

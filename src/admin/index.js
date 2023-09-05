@@ -2,11 +2,13 @@ const express = require("express");
 const router = express.Router();
 const { auth, authRole } = require("../../middlewares/auth");
 
-const { createSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
-const { getAllWarranty, getWarranty, updateWarranty } = require("../warranty");
+const { createSalePerson, deleteSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
+const { getAllWarranty, getWarranty, updateWarranty, deleteWarranty } = require("../warranty");
+const { getAllTransaction, getTransaction, deleteTransaction, updateTransaction } = require("../transaction");
 
 
 router.post("/sale-person", auth, authRole('admin'), createSalePerson);
+router.delete("/sale-person/:id", auth, authRole('admin'), deleteSalePerson)
 
 router.get("/users", auth, authRole('admin'), getAllUser);
 router.route("/user/:id")
@@ -16,6 +18,15 @@ router.route("/user/:id")
 
 
 router.get("/warranty", auth, authRole('admin'), getAllWarranty);
-router.route("/warranty/:id").get(auth, authRole("admin"), getWarranty).put(auth, authRole('admin'), updateWarranty);
+router.route("/warranty/:id")
+  .get(auth, authRole("admin"), getWarranty)
+  .put(auth, authRole(['admin', 'sale-person']), updateWarranty)
+  .delete(auth, authRole('admin'), deleteWarranty);
+
+router.get("/transactions", auth, authRole('admin'), getAllTransaction);
+router.route("/transaction/:id")
+  .get(auth, authRole("admin"), getTransaction)
+  .put(auth, authRole('admin'), updateTransaction)
+  .delete(auth, authRole('admin'), deleteTransaction);
 
 module.exports = router;
