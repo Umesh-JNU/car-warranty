@@ -152,7 +152,7 @@ exports.updateProfile = catchAsyncError(async (req, res, next) => {
   const userId = req.userId;
   delete req.body.password;
 
-  console.log(req.body)
+  console.log("update profile", {body: req.body})
   await userUpdate(userId, req.body, res, next);
 });
 
