@@ -5,6 +5,7 @@ const { auth, authRole } = require("../../middlewares/auth");
 const { createSalePerson, deleteSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
 const { getAllWarranty, getWarranty, updateWarranty, deleteWarranty } = require("../warranty");
 const { getAllTransaction, getTransaction, deleteTransaction, updateTransaction } = require("../transaction");
+const { deleteEnquiry, getEnquiry, getAllEnquiry, updateEnquiry } = require("../enquiry");
 
 
 router.post("/sale-person", auth, authRole('admin'), createSalePerson);
@@ -28,5 +29,11 @@ router.route("/transaction/:id")
   .get(auth, authRole("admin"), getTransaction)
   .put(auth, authRole('admin'), updateTransaction)
   .delete(auth, authRole('admin'), deleteTransaction);
+
+router.get("/enquiry", auth, authRole('admin'), getAllEnquiry);
+router.route("/enquiry/:id")
+  .get(auth, authRole("admin"), getEnquiry)
+  .put(auth, authRole('admin'), updateEnquiry)
+  .delete(auth, authRole('admin'), deleteEnquiry);
 
 module.exports = router;

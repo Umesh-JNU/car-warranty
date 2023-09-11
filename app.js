@@ -19,7 +19,7 @@ app.use(
 
 app.get("/", (req, res, next) => res.json({ message: "Server is running" }));
 
-const { adminRoute, salePersonRoute, userRoute, levelRoute, warrantyRoute, transactionRoute, paymentRoute } = require("./src");
+const { adminRoute, salePersonRoute, userRoute, levelRoute, warrantyRoute, transactionRoute, paymentRoute, enquiryRoute } = require("./src");
 const { generateClientToken } = require("./utils/paypal");
 
 app.use("/api/admin", adminRoute);
@@ -29,6 +29,7 @@ app.use("/api/level", levelRoute);
 app.use("/api/warranty", warrantyRoute);
 app.use("/api/transaction", transactionRoute);
 app.use("/api/payment", paymentRoute);
+app.use("/api/enquiry", enquiryRoute);
 
 app.post("/api/token", async (req, res) => {
   console.log("client token");
