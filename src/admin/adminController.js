@@ -39,7 +39,7 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
   var days = Math.floor((date - startDate) / (24 * 60 * 60 * 1000));
   var week = Math.ceil(days / 7);
 
-  const sales = await transactionModel.aggregate([
+  const pipeline = time === "month" ? [
     { $match: { status: "complete" } },
     {
       $project: {
@@ -49,6 +49,7 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         amount: 1, // Replace 'amount' with your actual sales amount field
       },
     },
+    { $match: { year: year, month: month } },
     {
       $group: {
         _id: {
@@ -63,6 +64,7 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         totalSales: { $sum: '$amount' },
       },
     },
+    { $sort: { '_id.week': 1 } },
     {
       $project: {
         _id: 0,
@@ -71,11 +73,40 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         week: '$_id.week',
         totalSales: 1,
       },
+    }
+  ] : [
+    { $match: { status: "complete" } },
+    {
+      $project: {
+        year: { $year: '$createdAt' },
+        month: { $month: '$createdAt' },
+        amount: 1, // Replace 'amount' with your actual sales amount field
+      },
     },
-  ]);
+    { $match: { year: year } },
+    {
+      $group: {
+        _id: {
+          year: '$year',
+          month: '$month',
+        },
+        totalSales: { $sum: '$amount' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        // year: '$_id.year',
+        month: '$_id.month',
+        // week: '$_id.week',
+        totalSales: 1,
+      },
+    },
+  ]
+  const sales = await transactionModel.aggregate(pipeline);
 
   console.log({ sales })
-  if (time === "all") {
+  // if (time === "all") {
     const users = await userModel.aggregate([
       {
         $group: {
@@ -110,224 +141,224 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
     return res.send({
       users,
       rejected,
-      passed, 
+      passed,
       sales
     });
-  }
-  if (time === "daily") {
-    const users = await userModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const rejected = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-failed" }
-      },
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const passed = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-passed" }
-      },
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
+  // }
+  // if (time === "daily") {
+  //   const users = await userModel.aggregate([
+  //     {
+  //       $match: {
+  //         $expr: {
+  //           $gt: [
+  //             "$createdAt",
+  //             { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
+  //           ],
+  //         },
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const rejected = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-failed" }
+  //     },
+  //     {
+  //       $match: {
+  //         $expr: {
+  //           $gt: [
+  //             "$createdAt",
+  //             { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
+  //           ],
+  //         },
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const passed = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-passed" }
+  //     },
+  //     {
+  //       $match: {
+  //         $expr: {
+  //           $gt: [
+  //             "$createdAt",
+  //             { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
+  //           ],
+  //         },
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
 
-    return res.send({
-      users,
-      rejected,
-      passed,
-    });
-  }
-  if (time === "weekly") {
-    const users = await userModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          week: week,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const rejected = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-failed" }
-      },
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          week: week,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const passed = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-passed" }
-      },
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          week: week,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
+  //   return res.send({
+  //     users,
+  //     rejected,
+  //     passed,
+  //   });
+  // }
+  // if (time === "weekly") {
+  //   const users = await userModel.aggregate([
+  //     {
+  //       $project: {
+  //         week: { $week: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         week: week,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const rejected = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-failed" }
+  //     },
+  //     {
+  //       $project: {
+  //         week: { $week: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         week: week,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const passed = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-passed" }
+  //     },
+  //     {
+  //       $project: {
+  //         week: { $week: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         week: week,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
 
-    return res.send({
-      users,
-      rejected,
-      passed,
-    });
-  }
-  if (time === "monthly") {
-    const users = await userModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          month: month,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const rejected = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-failed" }
-      },
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          month: month,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-    const passed = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-passed" }
-      },
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          month: month,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
+  //   return res.send({
+  //     users,
+  //     rejected,
+  //     passed,
+  //   });
+  // }
+  // if (time === "monthly") {
+  //   const users = await userModel.aggregate([
+  //     {
+  //       $project: {
+  //         month: { $month: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         month: month,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const rejected = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-failed" }
+  //     },
+  //     {
+  //       $project: {
+  //         month: { $month: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         month: month,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
+  //   const passed = await warrantyModel.aggregate([
+  //     {
+  //       $match: { status: "inspection-passed" }
+  //     },
+  //     {
+  //       $project: {
+  //         month: { $month: "$createdAt" },
+  //         year: { $year: "$createdAt" },
+  //       },
+  //     },
+  //     {
+  //       $match: {
+  //         year: year,
+  //         month: month,
+  //       },
+  //     },
+  //     {
+  //       $group: {
+  //         _id: null,
+  //         total: { $sum: 1 },
+  //       },
+  //     },
+  //   ]);
 
-    return res.send({
-      users,
-      rejected,
-      passed,
-    });
-  }
+  //   return res.send({
+  //     users,
+  //     rejected,
+  //     passed,
+  //   });
+  // }
 });
