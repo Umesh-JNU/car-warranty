@@ -310,7 +310,7 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   }
   else if (req.user?.role === 'sale-person') {
     var warranties = await warrantyModel.aggregate([
-      {$match: {salePerson: new mongoose.Types.ObjectId(req.userId)}},
+      { $match: { salePerson: new mongoose.Types.ObjectId(req.userId) } },
       ...populatePlanLevel,
       {
         $lookup: {
@@ -375,8 +375,13 @@ exports.updateWarranty = catchAsyncError(async (req, res, next) => {
 
   console.log("update warranty", req.body)
   const { id } = req.params;
+  const { document } = req.body;
   if (req.user.role === 'sale-person') {
-    var warranty = await warrantyModel.findOneAndUpdate({ _id: id, salePerson: req.user._id }, req.body, option)
+    if (document) {
+      var warranty = await warrantyModel.findByIdAndUpdate({ _id: id, salePerson: req.user._id }, { $push: { documents: document } }, option);
+    } else {
+      var warranty = await warrantyModel.findOneAndUpdate({ _id: id, salePerson: req.user._id }, req.body, option);
+    }
   } else {
     var warranty = await warrantyModel.findByIdAndUpdate(id, req.body, option);
   }

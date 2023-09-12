@@ -1,12 +1,13 @@
 const userModel = require("../user/user.model");
 const warrantyModel = require("../warranty/warranty.model");
-const catchAsyncError = require("../utils/catchAsyncError");
-const ErrorHandler = require("../utils/errorHandler");
-const { s3Uploadv2, s3UploadMulti } = require("../utils/s3");
+const catchAsyncError = require("../../utils/catchAsyncError");
+const ErrorHandler = require("../../utils/errorHandler");
+const { s3Uploadv2, s3UploadMulti } = require("../../utils/s3");
+const { transactionModel } = require("../transaction");
 
 exports.postSingleImage = catchAsyncError(async (req, res, next) => {
   const file = req.file;
-  if (!file) return next(new ErrorHandler("Invalid Image", 401));
+  if (!file) return next(new ErrorHandler("Invalid File (Image/PDF).", 401));
 
   const results = await s3Uploadv2(file);
   const location = results.Location && results.Location;
@@ -38,7 +39,43 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
   var days = Math.floor((date - startDate) / (24 * 60 * 60 * 1000));
   var week = Math.ceil(days / 7);
 
-  if (time == "all") {
+  const sales = await transactionModel.aggregate([
+    { $match: { status: "complete" } },
+    {
+      $project: {
+        year: { $year: '$createdAt' },
+        month: { $month: '$createdAt' },
+        day: { $dayOfMonth: '$createdAt' },
+        amount: 1, // Replace 'amount' with your actual sales amount field
+      },
+    },
+    {
+      $group: {
+        _id: {
+          year: '$year',
+          month: '$month',
+          week: {
+            $ceil: {
+              $divide: ['$day', 7],
+            },
+          },
+        },
+        totalSales: { $sum: '$amount' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        // year: '$_id.year',
+        // month: '$_id.month',
+        week: '$_id.week',
+        totalSales: 1,
+      },
+    },
+  ]);
+
+  console.log({ sales })
+  if (time === "all") {
     const users = await userModel.aggregate([
       {
         $group: {
@@ -47,7 +84,10 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const orders = await orderModel.aggregate([
+    const rejected = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-failed" }
+      },
       {
         $group: {
           _id: null,
@@ -55,130 +95,26 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const payments = await orderModel.aggregate([
+    const passed = await warrantyModel.aggregate([
       {
-        $project: {
-          amount: 1,
-        },
+        $match: { status: "inspection-passed" }
       },
       {
         $group: {
           _id: null,
-          total: { $sum: "$amount" },
-        },
-      },
-    ]);
-    const quantity = await orderModel.aggregate([
-      {
-        $project: {
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$quantity" },
-        },
-      },
-    ]);
-    const dailyUsers = await userModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
           total: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
     ]);
-    const dailyOrders = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
 
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyQuantity = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: "$quantity" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyPayments = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          amount: 1,
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: "$amount" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
     return res.send({
-      users: users,
-      payments: payments,
-      orders: orders,
-      quantity: quantity,
-      dailyUsers,
-      dailyOrders,
-      dailyQuantity,
-      dailyPayments,
+      users,
+      rejected,
+      passed, 
+      sales
     });
   }
-  if (time == "daily") {
+  if (time === "daily") {
     const users = await userModel.aggregate([
       {
         $match: {
@@ -197,7 +133,10 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const orders = await orderModel.aggregate([
+    const rejected = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-failed" }
+      },
       {
         $match: {
           $expr: {
@@ -215,7 +154,10 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const payments = await orderModel.aggregate([
+    const passed = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-passed" }
+      },
       {
         $match: {
           $expr: {
@@ -229,131 +171,22 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
       {
         $group: {
           _id: null,
-          total: { $sum: "$amount" },
-        },
-      },
-    ]);
-    const quantity = await orderModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 1 } },
-            ],
-          },
-        },
-      },
-      {
-        $addFields: {
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$quantity" },
-        },
-      },
-    ]);
-    const dailyUsers = await userModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 6 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
           total: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
     ]);
-    const dailyOrders = await orderModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 6 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          total: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyPayments = await orderModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 6 } },
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          total: { $sum: "$amount" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyQuantity = await orderModel.aggregate([
-      {
-        $match: {
-          $expr: {
-            $gt: [
-              "$createdAt",
-              { $dateSubtract: { startDate: date, unit: "day", amount: 6 } },
-            ],
-          },
-        },
-      },
-      {
-        $addFields: {
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-          total: { $sum: "$quantity" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
+
     return res.send({
-      users: users,
-      payments: payments,
-      orders: orders,
-      quantity: quantity,
-      dailyUsers,
-      dailyOrders,
-      dailyPayments,
-      dailyQuantity,
+      users,
+      rejected,
+      passed,
     });
   }
-  if (time == "weekly") {
+  if (time === "weekly") {
     const users = await userModel.aggregate([
       {
         $project: {
           week: { $week: "$createdAt" },
-
           year: { $year: "$createdAt" },
         },
       },
@@ -370,33 +203,13 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const payments = await orderModel.aggregate([
+    const rejected = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-failed" }
+      },
       {
         $project: {
           week: { $week: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          amount: 1,
-        },
-      },
-      {
-        $match: {
-          year: year,
-          week: week,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$amount" },
-        },
-      },
-    ]);
-    const orders = await orderModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-
           year: { $year: "$createdAt" },
         },
       },
@@ -413,13 +226,14 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const quantity = await orderModel.aggregate([
+    const passed = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-passed" }
+      },
       {
         $project: {
           week: { $week: "$createdAt" },
-
           year: { $year: "$createdAt" },
-          quantity: { $sum: "$products.quantity" },
         },
       },
       {
@@ -431,113 +245,22 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
       {
         $group: {
           _id: null,
-          total: { $sum: "$quantity" },
-        },
-      },
-    ]);
-    const dailyUsers = await userModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$week",
           total: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
     ]);
-    const dailyOrders = await orderModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
 
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$week",
-          total: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyQuantity = await orderModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$week",
-          total: { $sum: "quantity" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyPayments = await orderModel.aggregate([
-      {
-        $project: {
-          week: { $week: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          amount: 1,
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$week",
-          total: { $sum: "$amount" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
     return res.send({
-      users: users,
-      payments: payments,
-      orders: orders,
-      quantity: quantity,
-      dailyUsers,
-      dailyOrders,
-      dailyQuantity,
-      dailyPayments,
+      users,
+      rejected,
+      passed,
     });
   }
-  if (time == "monthly") {
+  if (time === "monthly") {
     const users = await userModel.aggregate([
       {
         $project: {
           month: { $month: "$createdAt" },
-
           year: { $year: "$createdAt" },
         },
       },
@@ -554,11 +277,13 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const orders = await orderModel.aggregate([
+    const rejected = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-failed" }
+      },
       {
         $project: {
           month: { $month: "$createdAt" },
-
           year: { $year: "$createdAt" },
         },
       },
@@ -575,13 +300,14 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
         },
       },
     ]);
-    const payments = await orderModel.aggregate([
+    const passed = await warrantyModel.aggregate([
+      {
+        $match: { status: "inspection-passed" }
+      },
       {
         $project: {
           month: { $month: "$createdAt" },
-
           year: { $year: "$createdAt" },
-          amount: 1,
         },
       },
       {
@@ -593,127 +319,15 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
       {
         $group: {
           _id: null,
-          total: { $sum: "$amount" },
-        },
-      },
-    ]);
-    const quantity = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-          month: month,
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$quantity" },
-        },
-      },
-    ]);
-    const dailyUsers = await userModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
           total: { $sum: 1 },
         },
       },
-      { $sort: { _id: 1 } },
     ]);
-    const dailyOrders = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
 
-          year: { $year: "$createdAt" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyQuantity = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          quantity: { $sum: "$products.quantity" },
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: "$quantity" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-    const dailyPayments = await orderModel.aggregate([
-      {
-        $project: {
-          month: { $month: "$createdAt" },
-
-          year: { $year: "$createdAt" },
-          amount: 1,
-        },
-      },
-      {
-        $match: {
-          year: year,
-        },
-      },
-      {
-        $group: {
-          _id: "$month",
-          total: { $sum: "$amount" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
     return res.send({
-      users: users,
-      payments: payments,
-      orders: orders,
-      quantity: quantity,
-      dailyUsers,
-      dailyOrders,
-      dailyQuantity,
-      dailyPayments,
+      users,
+      rejected,
+      passed,
     });
   }
 });

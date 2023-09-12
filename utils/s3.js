@@ -40,12 +40,13 @@ exports.s3UploadMulti = async (files) => {
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
+  console.log({file})
   if (file.mimetype.split("/")[0] === "image") {
     req.video_file = false;
     cb(null, true);
-//   } else if (file.mimetype.split("/")[0] === "video") {
-//     req.video_file = true;
-//     cb(null, true);
+  } else if (file.mimetype.split("/")[0] === "application") {
+    req.video_file = false;
+    cb(null, true);
   } else {
     cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE"), false);
   }
