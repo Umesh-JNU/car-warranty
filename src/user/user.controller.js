@@ -76,9 +76,9 @@ const loginWithGoogle = async (req, res, next) => {
 
 exports.login = catchAsyncError(async (req, res, next) => {
   console.log("user login", req.body);
-  const { email, password, loginGoogle } = req.body;
+  const { email, password, googleLogin } = req.body;
 
-  if (loginGoogle) {
+  if (googleLogin) {
     return await loginWithGoogle(req, res, next);
   }
 
