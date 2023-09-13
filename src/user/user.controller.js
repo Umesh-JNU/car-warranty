@@ -31,6 +31,12 @@ exports.createUser = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Something Went Wrong. Please try again.", 500));
   }
 
+  const token = await user.getJWTToken();
+
+  if (req.body.googleRegistration) {
+    return res.status(200).json({ user, token });
+  }
+
   try {
     const template = fs.readFileSync(path.join(__dirname, "userRegister.html"), "utf-8");
 
@@ -46,7 +52,6 @@ exports.createUser = catchAsyncError(async (req, res, next) => {
       message: renderedTemplate
     });
 
-    const token = await user.getJWTToken();
     res.status(200).json({
       user,
       token,
@@ -58,9 +63,24 @@ exports.createUser = catchAsyncError(async (req, res, next) => {
   }
 });
 
+const loginWithGoogle = async (req, res, next) => {
+  const { email } = req.body;
+  const user = await userModel.findOne({ email });
+  if (!user) {
+    return next(new ErrorHandler('User Not Found', 400));
+  }
+
+  const token = await user.getJWTToken();
+  return res.status(200).json({ user, token });
+};
+
 exports.login = catchAsyncError(async (req, res, next) => {
   console.log("user login", req.body);
-  const { email, password } = req.body;
+  const { email, password, loginGoogle } = req.body;
+
+  if (loginGoogle) {
+    return await loginWithGoogle(req, res, next);
+  }
 
   if (!email || !password)
     return next(new ErrorHandler("Please enter your email and password", 400));
@@ -152,7 +172,7 @@ exports.updateProfile = catchAsyncError(async (req, res, next) => {
   const userId = req.userId;
   delete req.body.password;
 
-  console.log("update profile", {body: req.body})
+  console.log("update profile", { body: req.body })
   await userUpdate(userId, req.body, res, next);
 });
 
