@@ -18,6 +18,11 @@ const transactionSchema = new mongoose.Schema({
 		type: Number,
 		required: [true, "Amount is required."],
 	},
+	paypalID: {
+		type: String,
+		required: [true, "Paypal orderID is required."],
+		select: false
+	},
 	status: {
 		type: String,
 		default: 'pending',

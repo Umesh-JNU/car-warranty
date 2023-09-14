@@ -30,6 +30,12 @@ const evalLoad = (s, b, type) => {
   return base_laod;
 }
 
+const calcTotal = (s, b, type, price) => {
+  console.log({ size: s, bhp: b, drive_type: type, planPrice: price });
+  const loadPercent = evalLoad(s, b, type) * 0.01;
+  return price + price * loadPercent;
+}
+
 function maskString(inputString) {
   if (typeof inputString !== 'string' || inputString.length < 4) {
     // Input is not a valid string or too short to mask
@@ -58,6 +64,75 @@ function maskString(inputString) {
 //   res.status(201).json({ warranty });
 // });
 
+exports.create2PaypalOrder = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id || !isValidObjectId(id))
+    return next(new ErrorHandler("Please provide the warranty id.", 400));
+
+  const warranty = await warrantyModel.findById(id).populate("plan");
+  if (!warranty)
+    return next(new ErrorHandler("Warranty not found.", 404));
+
+  const ttl = calcTotal(
+    warranty.vehicleDetails.size,
+    warranty.vehicleDetails.bhp,
+    warranty.vehicleDetails.drive_type,
+    warranty.plan.price
+  );
+  const data = await createOrder(ttl);
+
+  if (data.status !== 'CREATED')
+    return next(new ErrorHandler('Something went wrong', 500));
+
+  res.status(200).json({ data, orderID: data.id });
+});
+
+exports.create2Warranty = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id || !isValidObjectId(id))
+    return next(new ErrorHandler("Please provide the warranty id.", 400));
+
+  console.log("create2Warranty as onApprove", req.body)
+  const { order } = req.body;
+
+  if (!order) {
+    return next(new ErrorHandler("Bad Request", 400));
+  }
+
+  const warranty = await warrantyModel.findById(id).populate({
+    path: "plan",
+    populate: { path: "level" }
+  });
+  if (!warranty)
+    return next(new ErrorHandler("Warranty not found.", 404));
+
+  // capture payment
+  const captureData = await capturePayment(order.orderID);
+  const { payment_source } = captureData;
+
+  if (payment_source.paypal) {
+    var method = "paypal"
+    var source_id = payment_source.paypal.account_id;
+  } else if (payment_source.card) {
+    var method = "card"
+    var source_id = payment_source.card.last_digits;
+  }
+  // after that 2nd half transaction will be create
+  await transactionModel.create({
+    method, source_id, paypalID: order.orderID,
+    plan: warranty.plan.level.level,
+    amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
+    warranty: warranty._id,
+    user: req.userId
+  });
+  console.log({ captureData });
+
+  // TODO: store payment information such as the transaction ID
+  res.status(200).json({ captureData });
+});
+
 exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
   console.log("Create Paypal Order", req.body);
 
@@ -71,9 +146,8 @@ exports.createPaypalOrder = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Plan not found.", 400))
   }
 
-  const loadPercent = evalLoad(eng_size, bhp, drive_type);
-  const ttl = plan.price + loadPercent;
-  console.log({ plan, loadPercent, ttl });
+  const ttl = calcTotal(eng_size, bhp, drive_type, plan.price);
+  console.log({ plan, ttl });
 
   const data = await createOrder(ttl);
 
@@ -104,9 +178,9 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   // after that warranty and transaction will be created
   const { expiry_date, level } = await calcExpiryDate(warrantyData);
   console.log({ expiry_date, level })
-  const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId, paypalID: order.orderID });
+  const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId });
   const transaction = await transactionModel.create({
-    method, source_id,
+    method, source_id, paypalID: order.orderID,
     plan: level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
     warranty: warranty._id,
@@ -155,6 +229,106 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
+    const warranties = await warrantyModel.find({ status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status");
+
+    // var [activeWarranty] = await myWarranties(req.userId, [
+    //   {
+    //     $project: {
+    //       _id: 1,
+    //       start_date: 1,
+    //       expiry_date: 1,
+    //       plan: "$plan.level.level",
+    //       status: 1,
+    //       remaining_days: {
+    //         $dateDiff: {
+    //           startDate: today,
+    //           endDate: "$expiry_date",
+    //           unit: "day"
+    //         }
+    //       },
+    //       createdAt: 1,
+    //       updatedAt: 1,
+    //     }
+    //   },
+    //   {
+    //     $group: {
+    //       _id: null,
+    //       warranties: { $push: "$$ROOT" },
+    //       active: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $and: [
+    //                 { $lte: ['$start_date', today] },
+    //                 { $gte: ['$expiry_date', today] },
+    //                 { $eq: ['$status', "doc-delivered"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       },
+    //       expired: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $and: [
+    //                 { $lt: ['$expiry_date', today] },
+    //                 { $eq: ['$status', "doc-delivered"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       },
+    //       upcoming: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $or: [
+    //                 { $gt: ['$start_date', today] },
+    //                 { $eq: ['$status', "inspection-awaited"] },
+    //                 { $eq: ['$status', "inspection-passed"] },
+    //                 { $eq: ['$status', "order-placed"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       }
+    //     }
+    //   },
+    //   {
+    //     $project: {
+    //       _id: 0,
+    //       warranties: {
+    //         $filter: {
+    //           input: "$warranties",
+    //           as: "warranty",
+    //           cond: {
+    //             $and: [
+    //               { $lte: ['$$warranty.start_date', today] },
+    //               { $gte: ['$$warranty.expiry_date', today] },
+    //               { $eq: ['$$warranty.status', "doc-delivered"] }
+    //             ]
+    //           }
+    //         }
+    //       },
+    //       active: 1,
+    //       expired: 1,
+    //       upcoming: 1
+    //     }
+    //   },
+    // ]);
+
+    // if (!activeWarranty) {
+    //   return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [], activeWarranty })
+    // }
+
+    // var result = { warranties, activeWarranty }
     var [result] = await myWarranties(req.userId, [
       {
         $project: {
@@ -184,7 +358,22 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
                 {
                   $and: [
                     { $lte: ['$start_date', today] },
-                    { $gte: ['$expiry_date', today] }
+                    { $gte: ['$expiry_date', today] },
+                    { $eq: ['$status', "doc-delivered"] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          expired: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $lt: ['$expiry_date', today] },
+                    { $eq: ['$status', "doc-delivered"] }
                   ]
                 },
                 1,
@@ -195,7 +384,14 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
           upcoming: {
             $sum: {
               $cond: [
-                { $gt: ['$start_date', today] },
+                {
+                  $or: [
+                    { $gt: ['$start_date', today] },
+                    { $eq: ['$status', "inspection-awaited"] },
+                    { $eq: ['$status', "inspection-passed"] },
+                    { $eq: ['$status', "order-placed"] }
+                  ]
+                },
                 1,
                 0
               ]
@@ -213,12 +409,14 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
               cond: {
                 $and: [
                   { $lte: ['$$warranty.start_date', today] },
-                  { $gte: ['$$warranty.expiry_date', today] }
+                  { $gte: ['$$warranty.expiry_date', today] },
+                  { $eq: ['$$warranty.status', "doc-delivered"] }
                 ]
               }
             }
           },
           active: 1,
+          expired: 1,
           upcoming: 1
         }
       },
@@ -238,14 +436,15 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
             as: "transaction"
           }
         },
-        { $unwind: "$transaction" },
+        // { $unwind: "$transaction" },
         {
           $project: {
             _id: 1,
             start_date: 1,
             expiry_date: 1,
             plan: "$plan.level.level",
-            amount: "$transaction.amount",
+            amount: { $sum: "$transaction.amount" },
+            document: 1,
             status: 1,
             createdAt: 1,
             updatedAt: 1,
@@ -375,13 +574,13 @@ exports.updateWarranty = catchAsyncError(async (req, res, next) => {
 
   console.log("update warranty", req.body)
   const { id } = req.params;
-  const { document } = req.body;
+  // const { document } = req.body;
   if (req.user.role === 'sale-person') {
-    if (document) {
-      var warranty = await warrantyModel.findByIdAndUpdate({ _id: id, salePerson: req.user._id }, { $push: { documents: document } }, option);
-    } else {
-      var warranty = await warrantyModel.findOneAndUpdate({ _id: id, salePerson: req.user._id }, req.body, option);
-    }
+    // if (document) {
+    //   var warranty = await warrantyModel.findByIdAndUpdate({ _id: id, salePerson: req.user._id }, { $push: { documents: document } }, option);
+    // } else {
+    var warranty = await warrantyModel.findOneAndUpdate({ _id: id, salePerson: req.user._id }, req.body, option);
+    // }
   } else {
     var warranty = await warrantyModel.findByIdAndUpdate(id, req.body, option);
   }

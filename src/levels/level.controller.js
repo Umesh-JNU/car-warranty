@@ -99,15 +99,16 @@ exports.getLevelSuggestion = catchAsyncError(async (req, res, next) => {
     return next(new ErrorHandler("Bad Request", 400));
   }
 
-  const e = parseInt(engineSize);
-  const b = parseInt(bhp);
+  const e = parseFloat(engineSize);
+  const b = parseFloat(bhp);
   const a = getAge(dateFirstReg);
-  const m = parseInt(mileage);
+  const m = parseFloat(mileage);
 
   const load_per = evalLoad(e, b, driveType);
   console.log({ a, e, b, m, load_per });
 
   const levelsAndPlans = await levelModel.aggregate([
+    // used to select plan type - safe, secure and supreme
     {
       $match: {
         max_age: { $gte: a },

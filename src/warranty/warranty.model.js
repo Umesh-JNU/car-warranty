@@ -82,28 +82,29 @@ const warrantySchema = new mongoose.Schema({
 	},
 	status: {
 		type: String,
-		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered", "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
+		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered"], 
+		// "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
 		default: "inspection-awaited"
 	},
-	paypalID: {
-		type: String,
-		// required: [true, "Paypal orderID is required."],
-		select: false
-	},
-	payment: {
-		type: Boolean,
-		default: false,
-		select: false,
-	},
+	// paypalID: {
+	// 	type: String,
+	// 	// required: [true, "Paypal orderID is required."],
+	// 	select: false
+	// },
+	// payment: {
+	// 	type: Boolean,
+	// 	default: false,
+	// 	select: false,
+	// },
 	salePerson: {
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "User",
 		select: false
 	},
-	documents: [{
+	document: {
 		url: { type: String },
 		desc: { type: String }
-	}],
+	},
 	comments: [{ type: String }]
 }, { timestamps: true });
 
