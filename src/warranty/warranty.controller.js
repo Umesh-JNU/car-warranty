@@ -231,105 +231,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
 
     const warranties = await warrantyModel.find({ status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status");
 
-    // var [activeWarranty] = await myWarranties(req.userId, [
-    //   {
-    //     $project: {
-    //       _id: 1,
-    //       start_date: 1,
-    //       expiry_date: 1,
-    //       plan: "$plan.level.level",
-    //       status: 1,
-    //       remaining_days: {
-    //         $dateDiff: {
-    //           startDate: today,
-    //           endDate: "$expiry_date",
-    //           unit: "day"
-    //         }
-    //       },
-    //       createdAt: 1,
-    //       updatedAt: 1,
-    //     }
-    //   },
-    //   {
-    //     $group: {
-    //       _id: null,
-    //       warranties: { $push: "$$ROOT" },
-    //       active: {
-    //         $sum: {
-    //           $cond: [
-    //             {
-    //               $and: [
-    //                 { $lte: ['$start_date', today] },
-    //                 { $gte: ['$expiry_date', today] },
-    //                 { $eq: ['$status', "doc-delivered"] }
-    //               ]
-    //             },
-    //             1,
-    //             0
-    //           ]
-    //         }
-    //       },
-    //       expired: {
-    //         $sum: {
-    //           $cond: [
-    //             {
-    //               $and: [
-    //                 { $lt: ['$expiry_date', today] },
-    //                 { $eq: ['$status', "doc-delivered"] }
-    //               ]
-    //             },
-    //             1,
-    //             0
-    //           ]
-    //         }
-    //       },
-    //       upcoming: {
-    //         $sum: {
-    //           $cond: [
-    //             {
-    //               $or: [
-    //                 { $gt: ['$start_date', today] },
-    //                 { $eq: ['$status', "inspection-awaited"] },
-    //                 { $eq: ['$status', "inspection-passed"] },
-    //                 { $eq: ['$status', "order-placed"] }
-    //               ]
-    //             },
-    //             1,
-    //             0
-    //           ]
-    //         }
-    //       }
-    //     }
-    //   },
-    //   {
-    //     $project: {
-    //       _id: 0,
-    //       warranties: {
-    //         $filter: {
-    //           input: "$warranties",
-    //           as: "warranty",
-    //           cond: {
-    //             $and: [
-    //               { $lte: ['$$warranty.start_date', today] },
-    //               { $gte: ['$$warranty.expiry_date', today] },
-    //               { $eq: ['$$warranty.status', "doc-delivered"] }
-    //             ]
-    //           }
-    //         }
-    //       },
-    //       active: 1,
-    //       expired: 1,
-    //       upcoming: 1
-    //     }
-    //   },
-    // ]);
-
-    // if (!activeWarranty) {
-    //   return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [], activeWarranty })
-    // }
-
-    // var result = { warranties, activeWarranty }
-    var [result] = await myWarranties(req.userId, [
+    var [activeWarranty] = await myWarranties(req.userId, [
       {
         $project: {
           _id: 1,
@@ -422,9 +324,107 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
       },
     ]);
 
-    if (!result) {
-      return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [] })
+    if (!activeWarranty) {
+      return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [], activeWarranty })
     }
+
+    var result = { warranties, activeWarranty }
+    // var [result] = await myWarranties(req.userId, [
+    //   {
+    //     $project: {
+    //       _id: 1,
+    //       start_date: 1,
+    //       expiry_date: 1,
+    //       plan: "$plan.level.level",
+    //       status: 1,
+    //       remaining_days: {
+    //         $dateDiff: {
+    //           startDate: today,
+    //           endDate: "$expiry_date",
+    //           unit: "day"
+    //         }
+    //       },
+    //       createdAt: 1,
+    //       updatedAt: 1,
+    //     }
+    //   },
+    //   {
+    //     $group: {
+    //       _id: null,
+    //       warranties: { $push: "$$ROOT" },
+    //       active: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $and: [
+    //                 { $lte: ['$start_date', today] },
+    //                 { $gte: ['$expiry_date', today] },
+    //                 { $eq: ['$status', "doc-delivered"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       },
+    //       expired: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $and: [
+    //                 { $lt: ['$expiry_date', today] },
+    //                 { $eq: ['$status', "doc-delivered"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       },
+    //       upcoming: {
+    //         $sum: {
+    //           $cond: [
+    //             {
+    //               $or: [
+    //                 { $gt: ['$start_date', today] },
+    //                 { $eq: ['$status', "inspection-awaited"] },
+    //                 { $eq: ['$status', "inspection-passed"] },
+    //                 { $eq: ['$status', "order-placed"] }
+    //               ]
+    //             },
+    //             1,
+    //             0
+    //           ]
+    //         }
+    //       }
+    //     }
+    //   },
+    //   {
+    //     $project: {
+    //       _id: 0,
+    //       warranties: {
+    //         $filter: {
+    //           input: "$warranties",
+    //           as: "warranty",
+    //           cond: {
+    //             $and: [
+    //               { $lte: ['$$warranty.start_date', today] },
+    //               { $gte: ['$$warranty.expiry_date', today] },
+    //               { $eq: ['$$warranty.status', "doc-delivered"] }
+    //             ]
+    //           }
+    //         }
+    //       },
+    //       active: 1,
+    //       expired: 1,
+    //       upcoming: 1
+    //     }
+    //   },
+    // ]);
+
+    // if (!result) {
+    //   return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [] })
+    // }
   } else {
     var result = {
       warranties: await myWarranties(req.userId, [
