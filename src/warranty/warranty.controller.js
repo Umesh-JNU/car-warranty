@@ -229,7 +229,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
-    const warranties = await warrantyModel.find({ status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status");
+    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status");
 
     var [activeWarranty] = await myWarranties(req.userId, [
       {
@@ -325,7 +325,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
     ]);
 
     if (!activeWarranty) {
-      return res.status(200).json({ active: 0, upcoming: 0, expired: 0, warranties: [], activeWarranty })
+      return res.status(200).json({ active: 0, upcoming: 0, expired: 0, activeWarranty: [], warranties })
     }
 
     var result = { warranties, activeWarranty }
