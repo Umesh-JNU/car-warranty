@@ -14,7 +14,13 @@ exports.updateAfterPayment = catchAsyncError(async (req, res, next) => {
     switch (event_type) {
       case 'PAYMENT.CAPTURE.COMPLETED':
         // var warranty = await warrantyModel.findOneAndUpdate({ paypalID: order_id }, { payment: true });
-        await transactionModel.findOneAndUpdate({ paypalID: order_id }, { status: "complete" });
+        const trans = await transactionModel.findOneAndUpdate({ paypalID: order_id }, { status: "complete" });
+        console.log({ trans });
+        const allTransaction = await transactionModel.find({ warranty: trans.warranty });
+        console.log({ allTransaction });
+        if (allTransaction.length === 2) {
+          await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { status: "order-placed" })
+        }
         break;
       case 'PAYMENT.CAPTURE.DECLINED':
         // var warranty = await warrantyModel.findOne({ paypalID: order_id });
