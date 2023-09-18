@@ -6,6 +6,11 @@ const validateEmail = (email) => {
 };
 
 const vehicleDetailSchema = new mongoose.Schema({
+	"reg_num": {
+		type: String,
+		required: [true, "Vehicle's registration number is required."],
+		unique: true,
+	},
 	make: {
 		type: String,
 		required: [true, "Vehicle's make is required."],
@@ -91,11 +96,11 @@ const warrantySchema = new mongoose.Schema({
 	// 	// required: [true, "Paypal orderID is required."],
 	// 	select: false
 	// },
-	// payment: {
-	// 	type: Boolean,
-	// 	default: false,
-	// 	select: false,
-	// },
+	payment: {
+		type: Boolean,
+		default: false,
+		select: false,
+	},
 	salePerson: {
 		type: mongoose.Schema.Types.ObjectId,
 		ref: "User",

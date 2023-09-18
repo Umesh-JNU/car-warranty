@@ -127,6 +127,9 @@ exports.create2Warranty = catchAsyncError(async (req, res, next) => {
     warranty: warranty._id,
     user: req.userId
   });
+  warranty.payment = true;
+  await warranty.save();
+
   console.log({ captureData });
 
   // TODO: store payment information such as the transaction ID
@@ -229,7 +232,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
-    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status");
+    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status");
 
     var [activeWarranty] = await myWarranties(req.userId, [
       {
@@ -602,4 +605,43 @@ exports.deleteWarranty = catchAsyncError(async (req, res, next) => {
   res.status(200).json({
     message: "Warranty Deleted successfully.",
   });
+});
+
+exports.checkWarranty = catchAsyncError(async (req, res, next) => {
+  console.log("Checking warranty", req.body)
+  const { reg_num } = req.body;
+  if (!reg_num) {
+    return next(new ErrorHandler("Please provide the vehicle's registration number.", 400));
+  }
+
+  const today = new Date();
+  const renewal_lim = parseInt(process.env.RENEWAL_LIMIT);
+  console.log({ renewal_lim })
+  const warranty = await warrantyModel.aggregate([
+    {
+      $match: { "vehicleDetails.reg_num": { $regex: `^${reg_num}$`, $options: "i" } }
+    },
+    {
+      $project: {
+        _id: 1,
+        remaining_days: {
+          $dateDiff: {
+            startDate: today,
+            endDate: "$expiry_date",
+            unit: "day"
+          }
+        }
+      }
+    },
+    {
+      $match: { remaining_days: { $gt: renewal_lim } }
+    }
+  ]);
+
+  console.log({ warranty });
+  if (warranty.length > 0) {
+    return next(new ErrorHandler("You already have an active request for this vehicle number. Please try later", 400));
+  }
+
+  res.status(200).json({ message: "You are eligible for the renewal/purchase" });
 });
