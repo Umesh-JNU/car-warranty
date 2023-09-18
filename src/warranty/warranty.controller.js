@@ -232,7 +232,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
-    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status");
+    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status vehicleDetails");
 
     var [activeWarranty] = await myWarranties(req.userId, [
       {
@@ -242,6 +242,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
           expiry_date: 1,
           plan: "$plan.level.level",
           status: 1,
+          vehicleDetails: 1,
           remaining_days: {
             $dateDiff: {
               startDate: today,
@@ -448,6 +449,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
             plan: "$plan.level.level",
             amount: { $sum: "$transaction.amount" },
             document: 1,
+            vehicleDetails: 1,
             status: 1,
             createdAt: 1,
             updatedAt: 1,
