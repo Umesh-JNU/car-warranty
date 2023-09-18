@@ -157,7 +157,47 @@ exports.getUser = catchAsyncError(async (req, res, next) => {
       }
     ]);
   } else {
-    var user = await userModel.findById(id ? id : userId);
+    const userDetails = await userModel.findById(id ? id : userId);
+    console.log({userDetails})
+    const warranties = await warrantyModel.aggregate([
+      { $match: { user: new mongoose.Types.ObjectId(userDetails._id) } },
+      {
+        $lookup: {
+          from: "plans",
+          localField: "plan",
+          foreignField: "_id",
+          as: "plan"
+        }
+      },
+      { $unwind: "$plan" },
+      {
+        $lookup: {
+          from: "levels",
+          localField: "plan.level",
+          foreignField: "_id",
+          as: "plan.level"
+        }
+      },
+      { $unwind: "$plan.level" },
+      {
+        $lookup: {
+          from: "transactions",
+          localField: "_id",
+          foreignField: "warranty",
+          as: "transaction"
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          plan: "$plan.level.level",
+          amount: { $sum: "$transaction.amount" },
+          vehicleDetails: 1,
+          status: 1,
+        }
+      }
+    ]);
+    var user = { ...userDetails._doc, warranties };
   }
 
   if (!user) {
