@@ -3,6 +3,7 @@ const catchAsyncError = require("../../utils/catchAsyncError");
 const APIFeatures = require("../../utils/apiFeatures");
 const transactionModel = require("./transaction.model");
 const { isValidObjectId } = require("mongoose");
+const { refundOrder } = require("../../utils/paypal");
 
 
 // Create a new document
@@ -43,7 +44,7 @@ exports.getTransaction = catchAsyncError(async (req, res, next) => {
   if (!req.user) {
     var transaction = await transactionModel.findOne({ _id: id, user: req.userId }).select("-user");
   } else {
-    var transaction = await transactionModel.findById(id).populate("user", "firstname lastname email mobile_no");
+    var transaction = await transactionModel.findById(id).populate([{ path: "user", select: "firstname lastname email mobile_no" }, { path: "warranty", select: "status" }]);
   }
 
   if (!transaction) {
@@ -80,4 +81,32 @@ exports.deleteTransaction = catchAsyncError(async (req, res, next) => {
   res.status(200).json({
     message: "Transaction Deleted successfully.",
   });
+});
+
+exports.refundTransaction = catchAsyncError(async (req, res, next) => {
+  const { id } = req.params;
+  console.log({ id });
+  if (!isValidObjectId(id)) {
+    return next(new ErrorHandler("Invalid Id", 400));
+  }
+
+  let transaction = await transactionModel.findById(id).populate([
+    { path: "warranty", select: "status" },
+    { path: "user", select: "firstname lastname email mobile_no" }
+  ]).select("+paypalID.paymentID");
+  if (!transaction) {
+    return next(new ErrorHandler("Transaction not found", 404));
+  }
+
+  if (transaction.warranty?.status !== "inspection-failed") {
+    return next(new ErrorHandler("Something went wrong", 400));
+  }
+
+  transaction.status = "pending";
+  transaction = await transaction.save();
+  const data = await refundOrder(transaction.paypalID.paymentID);
+  console.log({ data });
+  transaction.status = "refunded";
+  transaction = await transaction.save();
+  res.status(200).json({ message: "Refund Successful.", transaction });
 });

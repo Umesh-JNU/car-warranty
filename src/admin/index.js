@@ -7,7 +7,7 @@ const { postSingleImage, getStatistics } = require("./adminController")
 
 const { createSalePerson, deleteSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
 const { getAllWarranty, getWarranty, updateWarranty, deleteWarranty } = require("../warranty");
-const { getAllTransaction, getTransaction, deleteTransaction, updateTransaction } = require("../transaction");
+const { getAllTransaction, getTransaction, deleteTransaction, updateTransaction, refundTransaction } = require("../transaction");
 const { deleteEnquiry, getEnquiry, getAllEnquiry, updateEnquiry } = require("../enquiry");
 
 
@@ -32,6 +32,7 @@ router.route("/transaction/:id")
   .get(auth, authRole("admin"), getTransaction)
   .put(auth, authRole('admin'), updateTransaction)
   .delete(auth, authRole('admin'), deleteTransaction);
+router.post("/transaction/:id/refund", auth, authRole("admin"), refundTransaction);
 
 router.get("/enquiry", auth, authRole('admin'), getAllEnquiry);
 router.route("/enquiry/:id")

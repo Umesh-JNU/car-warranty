@@ -121,7 +121,11 @@ exports.create2Warranty = catchAsyncError(async (req, res, next) => {
   }
   // after that 2nd half transaction will be create
   await transactionModel.create({
-    method, source_id, paypalID: order.orderID,
+    method, source_id,
+    paypalID: {
+      orderID: order.orderID,
+      paymentID: captureData.purchase_units[0].payments.captures[0].id
+    },
     plan: warranty.plan.level.level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
     warranty: warranty._id,
@@ -183,7 +187,11 @@ exports.createWarranty = catchAsyncError(async (req, res, next) => {
   console.log({ expiry_date, level })
   const warranty = await warrantyModel.create({ ...warrantyData, expiry_date, user: req.userId });
   const transaction = await transactionModel.create({
-    method, source_id, paypalID: order.orderID,
+    method, source_id,
+    paypalID: {
+      orderID: order.orderID,
+      paymentID: captureData.purchase_units[0].payments.captures[0].id
+    },
     plan: level,
     amount: parseInt(captureData.purchase_units[0].payments.captures[0].amount.value),
     warranty: warranty._id,

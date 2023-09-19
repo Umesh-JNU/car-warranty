@@ -19,14 +19,21 @@ const transactionSchema = new mongoose.Schema({
 		required: [true, "Amount is required."],
 	},
 	paypalID: {
-		type: String,
-		required: [true, "Paypal orderID is required."],
-		select: false
+		orderID: {
+			type: String,
+			required: [true, "Paypal orderID is required."],
+			select: false
+		},
+		paymentID: {
+			type: String,
+			required: [true, "Paypal paymentID is required."],
+			select: false
+		}
 	},
 	status: {
 		type: String,
 		default: 'pending',
-		enum: ['pending', 'fail', 'complete']
+		enum: ['pending', 'fail', 'complete', 'refunded']
 	},
 	type: {
 		type: String,

@@ -73,7 +73,24 @@ exports.capturePayment = async (orderID) => {
   };
 
   const { data } = await axios.post(`${url}/v2/checkout/orders/${orderID}/capture`, {}, config);
+  console.log("inside capture payment", { data });
+  return data;
+}
 
+exports.refundOrder = async (id) => {
+  const access_token = await generateAccessToken();
+  console.log({ access_token })
+
+  const config = {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${access_token}`,
+      'Prefer': 'return=representation'
+    }
+  };
+  // 'https://api-m.sandbox.paypal.com/v2/payments/captures/2GG279541U471931P/refund', 
+  const { data } = await axios.post(`${url}/v2/payments/captures/${id}/refund`, {}, config);
+  console.log("inside refund payment", { data })
   return data;
 }
 
