@@ -342,9 +342,10 @@ exports.forgotPassword = catchAsyncError(async (req, res, next) => {
   // get resetPassword Token
   const resetToken = user.getResetPasswordToken();
   await user.save({ validateBeforeSave: false });
-
+  console.log(req);
   // const resetPasswordUrl = `${process.env.FRONTEND_URL}/password/reset/${resetToken}`;
-  const resetPasswordUrl = `${req.protocol}://${req.get("host")}/password/reset/${resetToken}`;
+  console.log({ h: req.get("origin") })
+  const resetPasswordUrl = `${req.get("origin")}/password/reset/${resetToken}`;
   console.log({ resetPasswordUrl })
   try {
     const template = fs.readFileSync(path.join(__dirname, "passwordReset.html"), "utf-8");
