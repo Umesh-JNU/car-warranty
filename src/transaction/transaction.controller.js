@@ -106,7 +106,5 @@ exports.refundTransaction = catchAsyncError(async (req, res, next) => {
   transaction = await transaction.save();
   const data = await refundOrder(transaction.paypalID.paymentID);
   console.log({ data });
-  transaction.status = "refunded";
-  transaction = await transaction.save();
   res.status(200).json({ message: "Refund Successful.", transaction });
 });
