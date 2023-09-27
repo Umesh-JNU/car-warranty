@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const sendEmail = require("../../utils/sendEmail");
 const ErrorHandler = require("../../utils/errorHandler");
 const catchAsyncError = require("../../utils/catchAsyncError");
 const mongoose = require("mongoose");
@@ -20,7 +23,44 @@ exports.updateAfterPayment = catchAsyncError(async (req, res, next) => {
       // var warranty = await warrantyModel.findOneAndUpdate({ "paypalID.orderID": order_id }, { payment: true });
       const trans = await transactionModel.findOneAndUpdate({ "paypalID.orderID": order_id }, { status: "complete" });
       console.log({ trans });
-      await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { payment: true });
+      const warranty = await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { payment: true }).populate("user", "firstname lastname email");
+
+      try {
+        const template = fs.readFileSync(path.join(__dirname, "orderSummary.html"), "utf-8");
+
+        // /{{(\w+)}}/g - match {{Word}} globally
+        const renderedTemplate = template.replace(/{{(\w+)}}/g, (match, key) => {
+          console.log({ match, key })
+          return { 
+            reg_num: warranty.vehicleDetails.reg_num,
+            make: warranty.vehicleDetails.make,
+            fuel_type: warranty.vehicleDetails.fuel_type,
+            model: warranty.vehicleDetails.model,
+            date_first_reg: warranty.vehicleDetails.date_first_reg.toISOString().slice(0, 10),
+            size: warranty.vehicleDetails.size,
+            mileage: warranty.vehicleDetails.mileage,
+            drive_type: warranty.vehicleDetails.drive_type,
+            bhp: warranty.vehicleDetails.bhp,
+            start_date: warranty.start_date.toISOString().slice(0, 10),
+            expiry_date: warranty.expiry_date.toISOString().slice(0, 10),
+            service_history: warranty.service_history ? "YES" : "NO",
+            method: trans.method,
+            amount: trans.amount,
+            transaction_id: trans._id,
+            plan: trans.plan,
+            status: warranty.status,
+            firstname: warranty.user.firstname, 
+            lastname: warranty.user.lastname }[key] || match;
+        });
+
+        await sendEmail({
+          email: warranty.user.email,
+          subject: `Order Summary for Your Vehicle Warranty`,
+          message: renderedTemplate
+        });
+      } catch (error) {
+        return next(new ErrorHandler(error.message, 500));
+      }
       // const allTransaction = await transactionModel.find({ warranty: trans.warranty });
       // console.log({ allTransaction });
       // if (allTransaction.length === 2) {
