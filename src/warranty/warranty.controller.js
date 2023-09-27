@@ -240,7 +240,8 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
-    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status vehicleDetails");
+    // const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status vehicleDetails");
+    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status vehicleDetails");
 
     var [activeWarranty] = await myWarranties(req.userId, [
       {
