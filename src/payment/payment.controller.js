@@ -20,15 +20,17 @@ exports.updateAfterPayment = catchAsyncError(async (req, res, next) => {
       // var warranty = await warrantyModel.findOneAndUpdate({ "paypalID.orderID": order_id }, { payment: true });
       const trans = await transactionModel.findOneAndUpdate({ "paypalID.orderID": order_id }, { status: "complete" });
       console.log({ trans });
-      const allTransaction = await transactionModel.find({ warranty: trans.warranty });
-      console.log({ allTransaction });
-      if (allTransaction.length === 2) {
-        await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { status: "order-placed" })
-      }
+      await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { payment: true });
+      // const allTransaction = await transactionModel.find({ warranty: trans.warranty });
+      // console.log({ allTransaction });
+      // if (allTransaction.length === 2) {
+      //   await warrantyModel.findOneAndUpdate({ _id: trans.warranty }, { status: "order-placed" })
+      // }
       return res.status(200).json({ message: "Payment Capture Acknowleged." });
 
     case 'PAYMENT.CAPTURE.DECLINED':
       console.log({ event_type });
+      var { order_id } = resource?.supplementary_data?.related_ids;
       // var warranty = await warrantyModel.findOne({ "paypalID.orderID": order_id });
       await transactionModel.findOneAndUpdate({ "paypalID.orderID": order_id }, { status: "fail" });
       return res.status(200).json({ message: "Payment Declined Acknowleged." });

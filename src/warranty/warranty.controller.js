@@ -448,14 +448,15 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
             as: "transaction"
           }
         },
-        // { $unwind: "$transaction" },
+        { $unwind: "$transaction" },
         {
           $project: {
             _id: 1,
             start_date: 1,
             expiry_date: 1,
             plan: "$plan.level.level",
-            amount: { $sum: "$transaction.amount" },
+            // amount: { $sum: "$transaction.amount" },
+            amount: "$transaction.amount",
             document: 1,
             vehicleDetails: 1,
             status: 1,

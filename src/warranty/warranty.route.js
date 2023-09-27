@@ -5,8 +5,8 @@ const { createWarranty, createPaypalOrder, getMyWarranties, getWarranty, create2
 
 router.post("/create-paypal-order", auth, createPaypalOrder);
 router.post("/capture-paypal-payment", auth, createWarranty);
-router.post("/create-paypal-order/:id", auth, create2PaypalOrder);
-router.post("/capture-paypal-payment/:id", auth, create2Warranty);
+// router.post("/create-paypal-order/:id", auth, create2PaypalOrder);
+// router.post("/capture-paypal-payment/:id", auth, create2Warranty);
 router.get("/my-warranties", auth, getMyWarranties);
 router.get("/my-warranty/:id", auth, getWarranty);
 
