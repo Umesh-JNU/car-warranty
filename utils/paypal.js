@@ -43,7 +43,8 @@ exports.createOrder = async (amount) => {
       {
         amount: {
           currency_code: "EUR",
-          value: `${amount / 2}`,
+          // value: `${amount / 2}`,
+          value: `${amount}`,
         },
       },
     ],

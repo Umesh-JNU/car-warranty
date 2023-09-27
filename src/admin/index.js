@@ -32,7 +32,7 @@ router.route("/transaction/:id")
   .get(auth, authRole("admin"), getTransaction)
   .put(auth, authRole('admin'), updateTransaction)
   .delete(auth, authRole('admin'), deleteTransaction);
-router.post("/transaction/:id/refund", auth, authRole("admin"), refundTransaction);
+// router.post("/transaction/:id/refund", auth, authRole("admin"), refundTransaction);
 
 router.get("/enquiry", auth, authRole('admin'), getAllEnquiry);
 router.route("/enquiry/:id")
