@@ -4,6 +4,7 @@ const catchAsyncError = require("../../utils/catchAsyncError");
 const ErrorHandler = require("../../utils/errorHandler");
 const { s3Uploadv2, s3UploadMulti } = require("../../utils/s3");
 const { transactionModel } = require("../transaction");
+const { enquiryModel } = require("../enquiry");
 
 exports.postSingleImage = catchAsyncError(async (req, res, next) => {
   const file = req.file;
@@ -27,6 +28,27 @@ exports.postMultipleImages = catchAsyncError(async (req, res, next) => {
   } else {
     return next(new ErrorHandler("Invalid Image", 401));
   }
+});
+
+exports.getSummary = catchAsyncError(async (req, res, next) => {
+  const today = new Date();
+  const thirtyDaysFromNow = new Date().setDate(today.getDate() + 30);
+
+  const awaited = await warrantyModel.count({ status: 'inspection-awaited' });
+  const active = await warrantyModel.count({ status: 'doc-delivered' });
+  const toExpired = await warrantyModel.count({
+    expiry_date: {
+      $gte: today,
+      $lte: thirtyDaysFromNow,
+    }
+  });
+  const rejected = await warrantyModel.count({ status: 'inspection-failed' });
+  const expired = await warrantyModel.count({ expiry_date: { $lte: today } });
+  const enquiry = await enquiryModel.count();
+
+  res.status(200).json({
+    awaited, active, toExpired, rejected, expired, enquiry
+  })
 });
 
 exports.getStatistics = catchAsyncError(async (req, res, next) => {
@@ -107,43 +129,43 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
 
   console.log({ sales })
   // if (time === "all") {
-    const users = await userModel.aggregate([
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
+  const users = await userModel.aggregate([
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
       },
-    ]);
-    const rejected = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-failed" }
+    },
+  ]);
+  const rejected = await warrantyModel.aggregate([
+    {
+      $match: { status: "inspection-failed" }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
       },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
+    },
+  ]);
+  const passed = await warrantyModel.aggregate([
+    {
+      $match: { status: "inspection-passed" }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
       },
-    ]);
-    const passed = await warrantyModel.aggregate([
-      {
-        $match: { status: "inspection-passed" }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-        },
-      },
-    ]);
+    },
+  ]);
 
-    return res.send({
-      users,
-      rejected,
-      passed,
-      sales
-    });
+  return res.send({
+    users,
+    rejected,
+    passed,
+    sales
+  });
   // }
   // if (time === "daily") {
   //   const users = await userModel.aggregate([

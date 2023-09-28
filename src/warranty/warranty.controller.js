@@ -479,8 +479,11 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
 // Get all documents
 exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   console.log("get all warranties", req.query);
+  const today = new Date();
+  const thirtyDaysFromNow = new Date().setDate(today.getDate() + 30);
 
-  const { keyword, currentPage, resultPerPage } = req.query;
+  const { status, keyword, currentPage, resultPerPage } = req.query;
+
 
   const queryOptions = [];
   if (keyword) {
@@ -496,10 +499,47 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
     queryOptions.push({ $limit: r });
   }
 
+  if (status) {
+    switch (status) {
+      case 'AWAITED':
+        var match = { status: 'inspection-awaited' };
+        break;
+      case 'ACTIVE':
+        var match = {
+          status: 'doc-delivered',
+          start_date: { $lte: today },
+          expiry_date: { $gt: today }
+        };
+        break;
+
+      case 'REJECTED':
+        var match = { status: 'inspection-failed' };
+        break;
+
+      case 'TO-BE-EXPIRED':
+        var match = {
+          expiry_date: {
+            $gte: today,
+            $lte: thirtyDaysFromNow,
+          }
+        };
+        break;
+
+      case 'TO-BE-EXPIRED':
+        var match = { expiry_date: { $lte: today } };
+        break;
+
+      default:
+        var match = {};
+        break;
+    }
+  }
+  console.log({ match });
   // for user
   if (req.user?.role === 'admin') {
     var warranties = await warrantyModel.aggregate([
       ...populatePlanLevel,
+      { $match: match },
       {
         $lookup: {
           from: "users",
