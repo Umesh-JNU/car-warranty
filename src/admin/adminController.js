@@ -51,6 +51,50 @@ exports.getSummary = catchAsyncError(async (req, res, next) => {
   })
 });
 
+exports.getLeads = catchAsyncError(async (req, res, next) => {
+  const failed = await warrantyModel.aggregate([
+    {
+      $lookup: {
+        from: "transactions",
+        localField: "_id",
+        foreignField: "warranty",
+        as: "transaction"
+      }
+    },
+    { $unwind: "$transaction" },
+    {
+      $lookup: {
+        localField: "user",
+        foreignField: "_id",
+        from: "users",
+        as: "user"
+      }
+    },
+    { $unwind: "$user" },
+    { $match: { "transaction.status": "fail" } },
+    {
+      $project: {
+        user: 1,
+        status: "fail"
+      }
+    }
+  ]);
+  const expired = await warrantyModel.find({ expiry_date: { $lte: new Date() } }).populate("user");
+  const refunded = await warrantyModel.find({ status: "refunded" }).populate("user");
+
+  res.status(200).json({
+    leads: [
+      ...failed,
+      ...expired.map((data) => {
+        return { user: data.user, status: "expired" }
+      }),
+      ...refunded.map((data) => {
+        console.log({ data });
+        return { user: data.user, status: data.status }
+      })]
+  });
+});
+
 exports.getStatistics = catchAsyncError(async (req, res, next) => {
   const { time } = req.params;
   const date = new Date();

@@ -3,7 +3,7 @@ const router = express.Router();
 const { auth, authRole } = require("../../middlewares/auth");
 const { upload } = require("../../utils/s3");
 
-const { postSingleImage, getStatistics, getSummary } = require("./adminController")
+const { postSingleImage, getStatistics, getSummary, getLeads } = require("./adminController")
 
 const { createSalePerson, deleteSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
 const { getAllWarranty, getWarranty, updateWarranty, deleteWarranty } = require("../warranty");
@@ -42,6 +42,7 @@ router.route("/enquiry/:id")
 
 router.post("/image", auth, authRole('admin'), upload.single('image'), postSingleImage);
 
+router.get("/leads", auth, authRole('admin'), getLeads);
 router.get("/summary", auth, authRole('admin'), getSummary);
 router.get('/statistics/:time', auth, authRole('admin'), getStatistics);
 module.exports = router;

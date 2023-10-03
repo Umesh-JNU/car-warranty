@@ -87,7 +87,7 @@ const warrantySchema = new mongoose.Schema({
 	},
 	status: {
 		type: String,
-		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered"], 
+		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered", "refunded"], 
 		// "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
 		default: "inspection-awaited"
 	},
