@@ -95,6 +95,100 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
   });
 });
 
+const getRefund = async (time) => {
+  const date = new Date();
+  date.setHours(24, 0, 0, 0);
+  const month = date.getMonth() + 1;
+  const year = date.getFullYear();
+  let startDate = new Date(date.getFullYear(), 0, 1);
+  var days = Math.floor((date - startDate) / (24 * 60 * 60 * 1000));
+  var week = Math.ceil(days / 7);
+
+  const pipeline = time === "month" ? [
+    {
+      $lookup: {
+        from: "warranties",
+        localField: "warranty",
+        foreignField: "_id",
+        as: "warranty"
+      }
+    },
+    { $unwind: "$warranty" },
+    { $match: { "warranty.status": "refunded" } },
+    {
+      $project: {
+        year: { $year: '$warranty.updatedAt' },
+        month: { $month: '$warranty.updatedAt' },
+        day: { $dayOfMonth: '$warranty.updatedAt' },
+        amount: 1, // Replace 'amount' with your actual sales amount field
+      },
+    },
+    { $match: { year: year, month: month } },
+    {
+      $group: {
+        _id: {
+          year: '$year',
+          month: '$month',
+          week: {
+            $ceil: {
+              $divide: ['$day', 7],
+            },
+          },
+        },
+        totalSales: { $sum: '$amount' },
+      },
+    },
+    { $sort: { '_id.week': 1 } },
+    {
+      $project: {
+        _id: 0,
+        // year: '$_id.year',
+        // month: '$_id.month',
+        week: '$_id.week',
+        totalSales: 1,
+      },
+    }
+  ] : [
+    {
+      $lookup: {
+        from: "warranties",
+        localField: "warranty",
+        foreignField: "_id",
+        as: "warranty"
+      }
+    },
+    { $unwind: "$warranty" },
+    { $match: { "warranty.status": "refunded" } },
+    {
+      $project: {
+        year: { $year: '$warranty.updatedAt' },
+        month: { $month: '$warranty.updatedAt' },
+        amount: 1, // Replace 'amount' with your actual sales amount field
+      },
+    },
+    { $match: { year: year } },
+    {
+      $group: {
+        _id: {
+          year: '$year',
+          month: '$month',
+        },
+        totalSales: { $sum: '$amount' },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        // year: '$_id.year',
+        month: '$_id.month',
+        // week: '$_id.week',
+        totalSales: 1,
+      },
+    },
+  ];
+
+  return await transactionModel.aggregate(pipeline);
+}
 exports.getStatistics = catchAsyncError(async (req, res, next) => {
   const { time } = req.params;
   const date = new Date();
@@ -105,6 +199,7 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
   var days = Math.floor((date - startDate) / (24 * 60 * 60 * 1000));
   var week = Math.ceil(days / 7);
 
+  console.log({ time })
   const pipeline = time === "month" ? [
     { $match: { status: "complete" } },
     {
@@ -171,44 +266,47 @@ exports.getStatistics = catchAsyncError(async (req, res, next) => {
   ]
   const sales = await transactionModel.aggregate(pipeline);
 
+  const refund = await getRefund(time);
+
   console.log({ sales })
   // if (time === "all") {
-  const users = await userModel.aggregate([
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-      },
-    },
-  ]);
-  const rejected = await warrantyModel.aggregate([
-    {
-      $match: { status: "inspection-failed" }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-      },
-    },
-  ]);
-  const passed = await warrantyModel.aggregate([
-    {
-      $match: { status: "inspection-passed" }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: 1 },
-      },
-    },
-  ]);
+  // const users = await userModel.aggregate([
+  //   {
+  //     $group: {
+  //       _id: null,
+  //       total: { $sum: 1 },
+  //     },
+  //   },
+  // ]);
+  // const rejected = await warrantyModel.aggregate([
+  //   {
+  //     $match: { status: "inspection-failed" }
+  //   },
+  //   {
+  //     $group: {
+  //       _id: null,
+  //       total: { $sum: 1 },
+  //     },
+  //   },
+  // ]);
+  // const passed = await warrantyModel.aggregate([
+  //   {
+  //     $match: { status: "inspection-passed" }
+  //   },
+  //   {
+  //     $group: {
+  //       _id: null,
+  //       total: { $sum: 1 },
+  //     },
+  //   },
+  // ]);
 
   return res.send({
-    users,
-    rejected,
-    passed,
-    sales
+    // users,
+    // rejected,
+    // passed,
+    sales,
+    refund
   });
   // }
   // if (time === "daily") {

@@ -525,7 +525,7 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
         };
         break;
 
-      case 'TO-BE-EXPIRED':
+      case 'EXPIRED':
         var match = { expiry_date: { $lte: today } };
         break;
 
