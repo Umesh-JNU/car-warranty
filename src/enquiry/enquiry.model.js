@@ -13,10 +13,10 @@ const enquirySchema = new mongoose.Schema({
 		type: String,
 		required: [true, "Message is required."],
 	},
-	department: {
-		type: String,
-		required: [true, "Department is required."],
-	},
+	// department: {
+	// 	type: String,
+	// 	required: [true, "Department is required."],
+	// },
 }, { timestamps: true });
 
 const enquiryModel = mongoose.model('Enquiry', enquirySchema);

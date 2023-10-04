@@ -41,8 +41,10 @@ router.route("/enquiry/:id")
   .delete(auth, authRole('admin'), deleteEnquiry);
 
 router.post("/image", auth, authRole('admin'), upload.single('image'), postSingleImage);
+router.post("/upload-doc", auth, authRole('admin'), upload.single('doc'), postSingleImage);
 
 router.get("/leads", auth, authRole('admin'), getLeads);
 router.get("/summary", auth, authRole('admin'), getSummary);
 router.get('/statistics/:time', auth, authRole('admin'), getStatistics);
+
 module.exports = router;
