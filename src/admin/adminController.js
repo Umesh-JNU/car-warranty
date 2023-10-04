@@ -75,7 +75,8 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
     {
       $project: {
         user: 1,
-        status: "fail"
+        status: "fail",
+        updatedAt: "$transaction.updatedAt"
       }
     }
   ]);
@@ -90,7 +91,7 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
       }),
       ...refunded.map((data) => {
         console.log({ data });
-        return { user: data.user, status: data.status }
+        return { user: data.user, status: data.status, updatedAt: data.updatedAt }
       })]
   });
 });
