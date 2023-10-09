@@ -120,6 +120,7 @@ const warrantySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 warrantySchema.pre('save', function(next) {
+	console.log(this.isModified('status.value'), "ismodi")
 	if (this.isModified('status.value')) {
 			this.status.statusAt = new Date();
 	}

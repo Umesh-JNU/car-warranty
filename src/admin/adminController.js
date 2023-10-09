@@ -53,12 +53,12 @@ exports.getSummary = catchAsyncError(async (req, res, next) => {
 });
 
 exports.getLeads = catchAsyncError(async (req, res, next) => {
-  const failed = await warrantyModel.aggregate([
+  const leads = await warrantyModel.aggregate([
     {
       $lookup: {
-        from: "transactions",
         localField: "_id",
         foreignField: "warranty",
+        from: "transactions",
         as: "transaction"
       }
     },
@@ -72,29 +72,102 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
       }
     },
     { $unwind: "$user" },
-    { $match: { "transaction.status": "fail" } },
     {
       $project: {
         user: 1,
-        status: "fail",
-        updatedAt: "$transaction.updatedAt"
+        status: {
+          $cond: {
+            if: { $eq: ["$transaction.status", "fail"] },
+            then: "fail",
+            else: {
+              $cond: {
+                if: { $lte: ["$expiry_date", new Date()] },
+                then: "expired",
+                else: {
+                  $cond: {
+                    if: { $eq: ["$status.value", "refunded"] },
+                    then: "refunded",
+                    else: null
+                  }
+                }
+              }
+            }
+          }
+        },
+        updatedAt: {
+          $cond: {
+            if: { $eq: ["$transaction.status", "fail"] },
+            then: "$transaction.updatedAt",
+            else: {
+              $cond: {
+                if: { $lte: ["$expiry_date", new Date()] },
+                then: "$expiry_date",
+                else: {
+                  $cond: {
+                    if: { $eq: ["$status.value", "refunded"] },
+                    then: "$status.statusAt",
+                    else: null
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-    }
+    },
+    {
+      $match: {
+        status: { $in: ["fail", "expired", "refunded"] }
+      }
+    },
+    { $sort: { updatedAt: -1 } }
   ]);
-  const expired = await warrantyModel.find({ expiry_date: { $lte: new Date() } }).populate("user");
-  const refunded = await warrantyModel.find({ status: "refunded" }).populate("user");
 
-  res.status(200).json({
-    leads: [
-      ...failed,
-      ...expired.map((data) => {
-        return { user: data.user, status: "expired" }
-      }),
-      ...refunded.map((data) => {
-        console.log({ data });
-        return { user: data.user, status: data.status, updatedAt: data.updatedAt }
-      })]
-  });
+  //   const results = await warrantyModel.aggregate(aggregatePipeline).exec();
+
+  //   ])
+  // const leads = await warrantyModel.aggregate([
+  //   {
+  //     $lookup: {
+  //       from: "transactions",
+  //       localField: "_id",
+  //       foreignField: "warranty",
+  //       as: "transaction"
+  //     }
+  //   },
+  //   { $unwind: "$transaction" },
+  //   {
+  //     $lookup: {
+  //       localField: "user",
+  //       foreignField: "_id",
+  //       from: "users",
+  //       as: "user"
+  //     }
+  //   },
+  //   { $unwind: "$user" },
+  //   { $match: { "transaction.status": "fail" } },
+  //   {
+  //     $project: {
+  //       user: 1,
+  //       status: "fail",
+  //       updatedAt: "$transaction.updatedAt"
+  //     }
+  //   }
+  // ]);
+  // const expired = await warrantyModel.find({ expiry_date: { $lte: new Date() } }).populate("user");
+  // const refunded = await warrantyModel.find({ status: "refunded" }).populate("user");
+
+  res.status(200).json({ leads });
+  // leads: [
+  //   ...failed,
+  //   ...expired.map((data) => {
+  //     return { user: data.user, status: "expired" }
+  //   }),
+  //   ...refunded.map((data) => {
+  //     console.log({ data });
+  //     return { user: data.user, status: data.status, updatedAt: data.updatedAt }
+  //   })]
+  // });
 });
 
 const getRefund = async (time) => {
@@ -116,12 +189,12 @@ const getRefund = async (time) => {
       }
     },
     { $unwind: "$warranty" },
-    { $match: { "warranty.status": "refunded" } },
+    { $match: { "warranty.status.value": "refunded" } },
     {
       $project: {
-        year: { $year: '$warranty.updatedAt' },
-        month: { $month: '$warranty.updatedAt' },
-        day: { $dayOfMonth: '$warranty.updatedAt' },
+        year: { $year: '$warranty.status.statusAt' },
+        month: { $month: '$warranty.status.statusAt' },
+        day: { $dayOfMonth: '$warranty.status.statusAt' },
         amount: 1, // Replace 'amount' with your actual sales amount field
       },
     },
@@ -160,11 +233,11 @@ const getRefund = async (time) => {
       }
     },
     { $unwind: "$warranty" },
-    { $match: { "warranty.status": "refunded" } },
+    { $match: { "warranty.status.value": "refunded" } },
     {
       $project: {
-        year: { $year: '$warranty.updatedAt' },
-        month: { $month: '$warranty.updatedAt' },
+        year: { $year: '$warranty.status.statusAt' },
+        month: { $month: '$warranty.status.statusAt' },
         amount: 1, // Replace 'amount' with your actual sales amount field
       },
     },

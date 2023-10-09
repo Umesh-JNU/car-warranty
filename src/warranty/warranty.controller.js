@@ -633,7 +633,7 @@ exports.updateWarranty = catchAsyncError(async (req, res, next) => {
   console.log("update warranty", req.body)
   const { id } = req.params;
   if (req.body.status) {
-    req.body.status = { value: req.body.status }
+    req.body.status = { value: req.body.status, statusAt: new Date() }
   }
   // const { document } = req.body;
   if (req.user.role === 'sale-person') {
