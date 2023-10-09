@@ -460,7 +460,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
             amount: "$transaction.amount",
             document: 1,
             vehicleDetails: 1,
-            "status.value": 1,
+            status: 1,
             createdAt: 1,
             updatedAt: 1,
           }
