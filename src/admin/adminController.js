@@ -34,20 +34,21 @@ exports.getSummary = catchAsyncError(async (req, res, next) => {
   const today = new Date();
   const thirtyDaysFromNow = new Date().setDate(today.getDate() + 30);
 
-  const awaited = await warrantyModel.count({ status: 'inspection-awaited' });
-  const active = await warrantyModel.count({ status: 'doc-delivered' });
+  const awaited = await warrantyModel.count({ "status.value": 'inspection-awaited' });
+  const passed = await warrantyModel.count({ "status.value": ["inspection-passed", "order-placed", "doc-delivered"] });
+  const active = await warrantyModel.count({ "status.value": 'doc-delivered' });
   const toExpired = await warrantyModel.count({
     expiry_date: {
       $gte: today,
       $lte: thirtyDaysFromNow,
     }
   });
-  const rejected = await warrantyModel.count({ status: 'inspection-failed' });
+  const rejected = await warrantyModel.count({ "status.value": 'inspection-failed' });
   const expired = await warrantyModel.count({ expiry_date: { $lte: today } });
   const enquiry = await enquiryModel.count();
 
   res.status(200).json({
-    awaited, active, toExpired, rejected, expired, enquiry
+    awaited, passed, active, toExpired, rejected, expired, enquiry
   })
 });
 

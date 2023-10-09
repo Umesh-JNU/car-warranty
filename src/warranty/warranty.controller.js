@@ -240,8 +240,8 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
   if (req.query.active) {
     const today = new Date();
 
-    // const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status vehicleDetails");
-    const warranties = await warrantyModel.find({ user: req.userId, status: ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status vehicleDetails");
+    // const warranties = await warrantyModel.find({ user: req.userId, "status.value": ["inspection-failed", "inspection-awaited", "inspection-passed"], payment: false }).select("_id status vehicleDetails");
+    const warranties = await warrantyModel.find({ user: req.userId, "status.value": ["inspection-failed", "inspection-awaited", "inspection-passed"] }).select("_id status vehicleDetails");
 
     var [activeWarranty] = await myWarranties(req.userId, [
       {
@@ -250,7 +250,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
           start_date: 1,
           expiry_date: 1,
           plan: "$plan.level.level",
-          status: 1,
+          "status.value": 1,
           vehicleDetails: 1,
           remaining_days: {
             $dateDiff: {
@@ -349,7 +349,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
     //       start_date: 1,
     //       expiry_date: 1,
     //       plan: "$plan.level.level",
-    //       status: 1,
+    //       "status.value": 1,
     //       remaining_days: {
     //         $dateDiff: {
     //           startDate: today,
@@ -460,7 +460,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
             amount: "$transaction.amount",
             document: 1,
             vehicleDetails: 1,
-            status: 1,
+            "status.value": 1,
             createdAt: 1,
             updatedAt: 1,
           }
@@ -502,18 +502,21 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
   if (status) {
     switch (status) {
       case 'AWAITED':
-        var match = { status: 'inspection-awaited' };
+        var match = { "status.value": 'inspection-awaited' };
+        break;
+      case 'PASSED':
+        var match = { "status.value": { $in: ["inspection-passed", "order-placed", "doc-delivered"] } };
         break;
       case 'ACTIVE':
         var match = {
-          status: 'doc-delivered',
+          "status.value": 'doc-delivered',
           start_date: { $lte: today },
           expiry_date: { $gt: today }
         };
         break;
 
       case 'REJECTED':
-        var match = { status: 'inspection-failed' };
+        var match = { "status.value": 'inspection-failed' };
         break;
 
       case 'TO-BE-EXPIRED':
@@ -629,6 +632,9 @@ exports.updateWarranty = catchAsyncError(async (req, res, next) => {
 
   console.log("update warranty", req.body)
   const { id } = req.params;
+  if (req.body.status) {
+    req.body.status = { value: req.body.status }
+  }
   // const { document } = req.body;
   if (req.user.role === 'sale-person') {
     // if (document) {

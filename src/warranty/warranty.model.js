@@ -86,10 +86,16 @@ const warrantySchema = new mongoose.Schema({
 		required: [true, "Please select a plan."]
 	},
 	status: {
-		type: String,
-		enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered", "refunded"], 
-		// "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
-		default: "inspection-awaited"
+		value: {
+			type: String,
+			enum: ["inspection-failed", "inspection-awaited", "inspection-passed", "order-placed", "doc-delivered", "refunded"],
+			// "claim-requested", "claim-inspection", "claim-inspection-failed", "claim-in-progress", "claim-setteled"],
+			default: "inspection-awaited"
+		},
+		statusAt: {
+			type: Date,
+			default: Date.now 
+		}
 	},
 	// paypalID: {
 	// 	type: String,
@@ -112,6 +118,13 @@ const warrantySchema = new mongoose.Schema({
 	},
 	comments: [{ type: String }]
 }, { timestamps: true });
+
+warrantySchema.pre('save', function(next) {
+	if (this.isModified('status.value')) {
+			this.status.statusAt = new Date();
+	}
+	next();
+});
 
 const warrantyModel = mongoose.model('Warranty', warrantySchema);
 module.exports = warrantyModel;
