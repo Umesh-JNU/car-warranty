@@ -505,7 +505,12 @@ exports.getAllWarranty = catchAsyncError(async (req, res, next) => {
         var match = { "status.value": 'inspection-awaited' };
         break;
       case 'PASSED':
-        var match = { "status.value": { $in: ["inspection-passed", "order-placed", "doc-delivered"] } };
+        var match = {
+          $or: [
+            { "status.value": { $in: ["inspection-passed", "order-placed"] } },
+            { "status.value": "doc-delivered", start_date: { $gt: today } }
+          ]
+        };
         break;
       case 'ACTIVE':
         var match = {
