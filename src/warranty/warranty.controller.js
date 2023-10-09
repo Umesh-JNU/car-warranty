@@ -250,7 +250,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
           start_date: 1,
           expiry_date: 1,
           plan: "$plan.level.level",
-          "status.value": 1,
+          status: 1,
           vehicleDetails: 1,
           remaining_days: {
             $dateDiff: {
@@ -274,7 +274,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
                   $and: [
                     { $lte: ['$start_date', today] },
                     { $gte: ['$expiry_date', today] },
-                    { $eq: ['$status', "doc-delivered"] }
+                    { $eq: ['$status.value', "doc-delivered"] }
                   ]
                 },
                 1,
@@ -288,7 +288,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
                 {
                   $and: [
                     { $lt: ['$expiry_date', today] },
-                    { $eq: ['$status', "doc-delivered"] }
+                    { $eq: ['$status.value', "doc-delivered"] }
                   ]
                 },
                 1,
@@ -302,9 +302,9 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
                 {
                   $or: [
                     { $gt: ['$start_date', today] },
-                    { $eq: ['$status', "inspection-awaited"] },
-                    { $eq: ['$status', "inspection-passed"] },
-                    { $eq: ['$status', "order-placed"] }
+                    { $eq: ['$status.value', "inspection-awaited"] },
+                    { $eq: ['$status.value', "inspection-passed"] },
+                    { $eq: ['$status.value', "order-placed"] }
                   ]
                 },
                 1,
@@ -325,7 +325,7 @@ exports.getMyWarranties = catchAsyncError(async (req, res, next) => {
                 $and: [
                   { $lte: ['$$warranty.start_date', today] },
                   { $gte: ['$$warranty.expiry_date', today] },
-                  { $eq: ['$$warranty.status', "doc-delivered"] }
+                  { $eq: ['$$warranty.status.value', "doc-delivered"] }
                 ]
               }
             }
