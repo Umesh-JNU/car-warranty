@@ -3,7 +3,7 @@ const router = express.Router();
 const { auth, authRole } = require("../../middlewares/auth");
 const { upload } = require("../../utils/s3");
 
-const { postSingleImage, getStatistics, getSummary, getLeads } = require("./adminController")
+const { postSingleImage, getStatistics, getSummary, getLeads, getNewUsers } = require("./adminController")
 
 const { createSalePerson, deleteSalePerson, getAllUser, getUser, updateUser, deleteUser } = require("../user");
 const { getAllWarranty, getWarranty, updateWarranty, deleteWarranty } = require("../warranty");
@@ -34,6 +34,8 @@ router.route("/transaction/:id")
   .delete(auth, authRole('admin'), deleteTransaction);
 // router.post("/transaction/:id/refund", auth, authRole("admin"), refundTransaction);
 
+
+
 router.get("/enquiry", auth, authRole('admin'), getAllEnquiry);
 router.route("/enquiry/:id")
   .get(auth, authRole("admin"), getEnquiry)
@@ -44,6 +46,7 @@ router.post("/image", auth, authRole('admin'), upload.single('image'), postSingl
 router.post("/upload-doc", auth, authRole('admin'), upload.single('doc'), postSingleImage);
 
 router.get("/leads", auth, authRole('admin'), getLeads);
+router.get("/new-users",auth, authRole('admin'), getNewUsers);
 router.get("/summary", auth, authRole('admin'), getSummary);
 router.get('/statistics/:time', auth, authRole('admin'), getStatistics);
 

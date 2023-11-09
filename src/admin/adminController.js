@@ -5,6 +5,7 @@ const ErrorHandler = require("../../utils/errorHandler");
 const { s3Uploadv2, s3UploadMulti } = require("../../utils/s3");
 const { transactionModel } = require("../transaction");
 const { enquiryModel } = require("../enquiry");
+const APIFeatures = require("../../utils/apiFeatures");
 
 exports.postSingleImage = catchAsyncError(async (req, res, next) => {
   const file = req.file;
@@ -35,15 +36,8 @@ exports.getSummary = catchAsyncError(async (req, res, next) => {
   const thirtyDaysFromNow = new Date().setDate(today.getDate() + 30);
 
   const awaited = await warrantyModel.count({ "status.value": 'inspection-awaited' });
-  const passed = await warrantyModel.count({
-    $or: [
-      { "status.value": "inspection-passed" },
-      { "status.value": "order-placed" },
-      { "status.value": "doc-delivered", "start_date": { $gt: today } },
-    ]
-  });
-  // const passed = await warrantyModel.count({ "status.value": "inspection-passed", "order-placed", "doc-delivered"] });
-  const active = await warrantyModel.count({ "status.value": 'doc-delivered', "start_date": { $lte: today } });
+  const passed = await warrantyModel.count({ "status.value": ["inspection-passed", "order-placed", "doc-delivered"] });
+  const active = await warrantyModel.count({ "status.value": 'doc-delivered' });
   const toExpired = await warrantyModel.count({
     expiry_date: {
       $gte: today,
@@ -59,8 +53,48 @@ exports.getSummary = catchAsyncError(async (req, res, next) => {
   })
 });
 
+//siddhant ka code
+
+exports.getNewUsers = catchAsyncError(async (req, res, next) => {
+  // const newUsers = await userModel.find({
+  //   _id: {
+  //     $nin: await warrantyModel.distinct("user")
+  //   }
+
+  // });
+
+  const apiFeature = new APIFeatures(
+    userModel.find({
+      _id: {
+        $nin: await warrantyModel.distinct("user")
+      }
+  
+    }).sort({createdAt: -1}),req.query
+  ).search();
+
+ let newUsers = await apiFeature.query;
+ 
+ let newUsersCount = newUsers.length;
+  
+ if (req.query.resultPerPage && req.query.currentPage) {
+  apiFeature.pagination();  
+  newUsers = await apiFeature.query.clone();
+}
+  
+
+  res.status(200).json({ newUsers, newUsersCount });
+
+});
+
+// yaha tak
+
+//ye leads may bhi edit kiya hai: 
 exports.getLeads = catchAsyncError(async (req, res, next) => {
-  const leads = await warrantyModel.aggregate([
+
+  
+
+  
+  let leads = await warrantyModel.aggregate([
     {
       $lookup: {
         localField: "_id",
@@ -130,6 +164,22 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
     { $sort: { updatedAt: -1 } }
   ]);
 
+  const regex = new RegExp(req.query.keyword,'i');
+
+  leads = leads.filter(lead=>{
+
+    const user = lead.user;
+
+    return (
+      (user.firstname?.match(regex) || '').length > 0 ||
+      (user.lastname?.match(regex) || '').length > 0 ||
+      (user.email?.match(regex) || '').length > 0 ||
+      (user.mobile_no?.match(regex) || '').length > 0
+    );
+  })
+
+  const leadsCount = leads.length;
+
   //   const results = await warrantyModel.aggregate(aggregatePipeline).exec();
 
   //   ])
@@ -164,7 +214,7 @@ exports.getLeads = catchAsyncError(async (req, res, next) => {
   // const expired = await warrantyModel.find({ expiry_date: { $lte: new Date() } }).populate("user");
   // const refunded = await warrantyModel.find({ status: "refunded" }).populate("user");
 
-  res.status(200).json({ leads });
+  res.status(200).json({ leads , leadsCount});
   // leads: [
   //   ...failed,
   //   ...expired.map((data) => {

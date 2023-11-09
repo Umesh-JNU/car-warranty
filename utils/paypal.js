@@ -9,6 +9,7 @@ const paypalURL = {
   'production': 'https://api-m.paypal.com'
 };
 
+console.log({ node_env: process.env.NODE_ENV });
 const url = paypalURL[process.env.NODE_ENV];
 console.log({ url });
 
@@ -42,7 +43,7 @@ exports.createOrder = async (amount) => {
     purchase_units: [
       {
         amount: {
-          currency_code: "EUR",
+          currency_code: "GBP",
           // value: `${amount / 2}`,
           value: `${amount}`,
         },
